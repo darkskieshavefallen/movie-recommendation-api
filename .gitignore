@@ -1,0 +1,22 @@
+# Virtual environment
+.venv/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Environment
+.env
+
+# IDE
+.idea/workspace.xml
+.idea/shelf/
+.idea/httpRequests/
+
+# macOS
+.DS_Store
+
+# Logs
+*.log
