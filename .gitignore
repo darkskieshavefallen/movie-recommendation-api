@@ -4,19 +4,13 @@
 # Python
 __pycache__/
 *.py[cod]
-*.pyo
-*.pyd
+*.egg-info/
+
+# IDE
+.idea/
 
 # Environment
 .env
-
-# IDE
-.idea/workspace.xml
-.idea/shelf/
-.idea/httpRequests/
-
-# macOS
-.DS_Store
 
 # Logs
 *.log
