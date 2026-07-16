@@ -1,96 +1,75 @@
 # Movie Recommendation API
 
-My first pet project.
+> A learning project focused on building a production-style backend using FastAPI and modern Python technologies.
 
-Stack:
+## Tech Stack
 
 - Python 3.13
 - FastAPI
 - PostgreSQL
-- SQLAlchemy
+- SQLAlchemy 2.x
 - Alembic
-- Pydantic v2 (+ pydantic-settings)
-- httpx
-- asyncpg
-- pytest (dev)
-- ruff (dev)
+- Pydantic v2
+- Pydantic Settings
+- HTTPX
+- AsyncPG
+- Pytest
+- Ruff
 
----
+## Project Structure
 
-## Конфигурация приложения и переменных окружения
-
-- Все параметры приложения централизованы.
-- Конфигурация реализована через pydantic-settings (app/core/settings.py), значения подгружаются из файла .env.
-- Пример переменных см. в .env.example (APP_TITLE, APP_VERSION).
-- Значения загружаются один раз, фабрика get_settings() использует lru_cache (непрерывная гарантия singleton).
-- Прямой доступ к переменным окружения (os.getenv) запрещён — все обращения только через app.core.settings.get_settings().
-- Добавляйте переменные в .env.example для новых настроек (например, для будущей настройки БД).
-
-## Установка и сборка
-
-- Убедитесь, что у вас установлен Python >=3.13 и pip >= 23.1
-- Все зависимости и инфраструктура проекта объявлены в pyproject.toml.
-- Для установки только основных зависимостей используйте:
-  ```sh
-  pip install .
-  ```
-- Для разработки (тесты и линтинг):
-  ```sh
-  pip install .[dev]
-  ```
-
-## Инфраструктура packaging и поиска пакетов
-
-- Проект использует **плоскую компоновку**. Основной устанавливаемый пакет — только `app`. Директории `alembic/` и `tests/` не попадают в финальный пакет.
-- В pyproject.toml реализовано:
-  ```toml
-  [build-system]
-  requires = ["setuptools>=61", "wheel"]
-  build-backend = "setuptools.build_meta"
-
-  [tool.setuptools.packages.find]
-  include = ["app*"]
-  exclude = ["tests*", "alembic*"]
-  ```
-
-## Структура проекта
-
-```
+```text
 app/
-    api/             # Роутеры FastAPI (HTTP endpoints)
-    core/            # Инфраструктурные модули (настройки, dependencies и т.д.)
-    integrations/    # Интеграции с внешними API/сервисами
-    models/          # SQLAlchemy ORM-модели (структура БД)
-    repositories/    # Слой доступа к данным (работа с БД)
-    schemas/         # Pydantic-схемы (валидация и сериализация)
-    services/        # Бизнес-логика приложения
-    __init__.py      # Делает app модулем Python
+├── api/             # FastAPI routers
+├── core/            # Configuration and infrastructure
+├── integrations/    # External APIs
+├── models/          # SQLAlchemy models
+├── repositories/    # Data access layer
+├── schemas/         # Pydantic schemas
+└── services/        # Business logic
 
-tests/               # Тесты проекта (без __init__.py)
-alembic/              # Миграции Alembic для управления схемой БД
+tests/
+alembic/
 ```
 
-### Краткое описание директорий и файлов:
-- **app/** — основной Python-пакет проекта
-- **api/** — роутеры/контроллеры (минимум логики)
-- **services/** — бизнес-логика
-- **repositories/** — доступ к БД через ORM
-- **models/** — описание структуры таблиц БД
-- **schemas/** — сериализация и валидация данных
-- **integrations/** — интеграция с внешними сервисами
-- **core/** — настройки, зависимости и база инфраструктуры
-- **tests/** — все виды тестов
-- **alembic/** — файлы миграций базы данных
+## Getting Started
 
-Каждая директория предназначена для своего слоя приложения, что обеспечивает чистую архитектуру и упрощает поддержку и масштабирование.
+Create a virtual environment:
 
----
+```bash
+python -m venv .venv
+```
 
-#### Кратко про инфраструктуру и зависимости
-- Используем только необходимые продукты для современного FastAPI-backend.
-- Pydantic Settings — для работы с конфигами и переменными окружения.
-- asyncpg — асинхронный драйвер для PostgreSQL.
-- httpx — асинхронная работа с внешними API.
-- Pytest и Ruff — только для разработки.
-- Packaging и установка: только пакет app и его подпакеты попадают в итоговую сборку — alembic и tests игнорируются.
+Install dependencies:
 
+```bash
+pip install -e ".[dev]"
+```
+
+Create a local configuration file:
+
+```bash
+cp .env.example .env
+```
+
+Run the application:
+
+```bash
+uvicorn app.main:app --reload
+```
+
+Swagger UI:
+
+```
+http://localhost:8000/docs
+```
+
+## Project Goals
+
+- Learn modern backend development with FastAPI
+- Build a clean layered architecture
+- Integrate external movie APIs
+- Work with PostgreSQL and Alembic
+- Cover the application with tests
+- Containerize the application with Docker
+- Build a React frontend
