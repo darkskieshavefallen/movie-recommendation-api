@@ -43,4 +43,6 @@ pyproject.toml
 - Use repositories for database access.
 - Explain architectural decisions before making significant changes.
 - Never introduce unnecessary dependencies.
-- Prefer readability over cleverness.
+- Prefer readability over cleverness.- Никогда не используйте os.getenv() напрямую.
+- Доступ ко всем настройкам должен осуществляться через app.core.settings.
+- Настройки должны загружаться только один раз с использованием фабрики lru_cache.

@@ -1,17 +1,18 @@
 from fastapi import FastAPI
 
+from app.core.settings import get_settings
+
+app_settings = get_settings()
+
 app = FastAPI(
-    title="Movie Recommendation API",
+    title=app_settings.app_title,
     description="Backend service for movie recommendations.",
-    version="0.1.0",
+    version=app_settings.app_version,
     docs_url="/docs",
     redoc_url="/redoc",
 )
 
 
-@app.get(
-    "/health",
-    summary="Health check",
-)
+@app.get("/health", summary="Health check")
 def health_check() -> dict[str, str]:
     return {"status": "ok"}
