@@ -1,5 +1,6 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.exceptions import MovieNotFoundError
 from app.repositories.movie import MovieRepository
 from app.schemas.movie import MovieCreate, MovieRead
 
@@ -40,12 +41,12 @@ class MovieService:
     async def get_movie(
         self,
         movie_id: int,
-    ) -> MovieRead | None:
+    ) -> MovieRead:
         """Return a movie by its ID."""
         orm_movie = await self._repository.get_by_id(movie_id)
 
         if orm_movie is None:
-            return None
+            raise MovieNotFoundError(movie_id)
 
         return MovieRead.model_validate(orm_movie)
 

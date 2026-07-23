@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, Path, Query, status
 
 from app.api.dependencies import get_movie_service
 from app.schemas.movie import MovieCreate, MovieRead
@@ -15,8 +17,8 @@ router = APIRouter(
     response_model=list[MovieRead],
 )
 async def list_movies(
-    offset: int = 0,
-    limit: int = 100,
+    offset: Annotated[int, Query(ge=0)] = 0,
+    limit: Annotated[int, Query(ge=1, le=100)] = 100,
     service: MovieService = Depends(get_movie_service),
 ) -> list[MovieRead]:
     """Return a paginated list of movies."""
@@ -31,19 +33,11 @@ async def list_movies(
     response_model=MovieRead,
 )
 async def get_movie(
-    movie_id: int,
+    movie_id: Annotated[int, Path(ge=1)],
     service: MovieService = Depends(get_movie_service),
 ) -> MovieRead:
     """Return a movie by its ID."""
-    movie = await service.get_movie(movie_id)
-
-    if movie is None:
-        raise HTTPException(
-            status_code=404,
-            detail="Movie not found",
-        )
-
-    return movie
+    return await service.get_movie(movie_id)
 
 
 @router.post(
