@@ -1,7 +1,8 @@
 from fastapi import FastAPI
 
-from app.core.settings import get_settings
 from app.api.health import router as health_router
+from app.api.movies import router as movies_router
+from app.core.settings import get_settings
 
 app_settings = get_settings()
 
@@ -14,3 +15,4 @@ app = FastAPI(
 )
 
 app.include_router(health_router)
+app.include_router(movies_router)
