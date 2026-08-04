@@ -9,6 +9,14 @@ class MovieCreate(BaseModel):
     description: str | None = None
 
 
+class MovieUpdate(BaseModel):
+    """Schema for updating a movie."""
+
+    title: str
+    release_year: int
+    description: str | None = None
+
+
 class MovieRead(BaseModel):
     """Schema for reading movie data."""
 
