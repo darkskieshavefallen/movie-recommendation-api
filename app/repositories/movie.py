@@ -47,6 +47,64 @@ class MovieRepository:
 
         return result.scalar_one_or_none()
 
+    async def update(
+        self,
+        movie_id: int,
+        title: str,
+        release_year: int,
+        description: str | None = None,
+    ) -> Movie | None:
+        """
+        Update an existing movie.
+
+        The method only updates the object in the current transaction.
+        It does not commit the transaction.
+
+        Args:
+            movie_id: The identifier of the movie to update.
+            title: New title.
+            release_year: New release year.
+            description: New description.
+
+        Returns:
+            Updated Movie if found, otherwise None.
+        """
+        movie = await self.get_by_id(movie_id)
+
+        if movie is None:
+            return None
+
+        movie.title = title
+        movie.release_year = release_year
+        movie.description = description
+
+        await self.session.flush()
+
+        return movie
+
+    async def delete(self, movie_id: int) -> bool:
+        """
+        Delete an existing movie.
+
+        The method only deletes the object in the current transaction.
+        It does not commit the transaction.
+
+        Args:
+            movie_id: The identifier of the movie to delete.
+
+        Returns:
+            True if the movie was found and deleted, False otherwise.
+        """
+        movie = await self.get_by_id(movie_id)
+
+        if movie is None:
+            return False
+
+        await self.session.delete(movie)
+        await self.session.flush()
+
+        return True
+
     async def get_all(
         self,
         offset: int = 0,

@@ -1,10 +1,12 @@
 ![Python](https://img.shields.io/badge/Python-3.13-blue)
 ![FastAPI](https://img.shields.io/badge/FastAPI-Latest-009688)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-blue)
+![SQLAlchemy](https://img.shields.io/badge/SQLAlchemy-2.x-red)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 # Movie Recommendation API
 
-> A learning project focused on building a production-ready REST API using FastAPI, PostgreSQL, and modern Python development practices.
+> A learning project focused on building a production-ready REST API using FastAPI, PostgreSQL, SQLAlchemy Async, and modern Python development practices.
 
 ---
 
@@ -12,6 +14,9 @@
 
 - Async REST API built with FastAPI
 - Layered architecture (API → Service → Repository)
+- Dependency Injection using FastAPI
+- Global exception handling
+- Request validation
 - PostgreSQL with SQLAlchemy 2.x Async ORM
 - Database migrations with Alembic
 - Data validation using Pydantic v2
@@ -41,35 +46,55 @@
 ## Architecture
 
 ```text
-HTTP Request
-      │
-      ▼
-API (Controllers)
-      │
-      ▼
-Services
-      │
-      ▼
-Repositories
-      │
-      ▼
-PostgreSQL
+                HTTP Request
+                     │
+                     ▼
+              FastAPI Routers
+                     │
+                     ▼
+                 Services
+                     │
+                     ▼
+              Repositories
+                     │
+                     ▼
+                PostgreSQL
+
+
+        Domain Exceptions
+               │
+               ▼
+      Exception Handlers
+               │
+               ▼
+          HTTP Responses
 ```
 
-### Project Structure
+---
+
+## Project Structure
 
 ```text
 app/
-├── api/             # FastAPI routers and dependencies
-├── core/            # Configuration and database
-├── integrations/    # External services
-├── models/          # SQLAlchemy ORM models
-├── repositories/    # Database access layer
-├── schemas/         # Pydantic DTOs
-├── services/        # Business logic
+├── api/
+│   ├── dependencies.py
+│   ├── exception_handlers.py
+│   ├── health.py
+│   └── movies.py
+│
+├── core/
+│   ├── database.py
+│   ├── exceptions.py
+│   └── settings.py
+│
+├── integrations/
+├── models/
+├── repositories/
+├── schemas/
+├── services/
 
-tests/               # Unit and integration tests
-alembic/             # Database migrations
+tests/
+alembic/
 ```
 
 ---
@@ -91,13 +116,13 @@ python -m venv .venv
 
 ### 3. Activate the virtual environment
 
-Windows:
+**Windows**
 
 ```bash
 .venv\Scripts\activate
 ```
 
-Linux/macOS:
+**Linux/macOS**
 
 ```bash
 source .venv/bin/activate
@@ -129,15 +154,28 @@ uvicorn app.main:app --reload
 
 ---
 
+## Available Endpoints
+
+| Method | Endpoint | Description |
+|---------|----------|-------------|
+| GET | `/health` | Health check |
+| GET | `/movies` | List movies |
+| GET | `/movies/{id}` | Get movie by ID |
+| POST | `/movies` | Create a movie |
+| PUT | `/movies/{id}` | Update a movie |
+| DELETE | `/movies/{id}` | Delete a movie |
+
+---
+
 ## API Documentation
 
-Swagger UI
+### Swagger UI
 
 ```text
 http://localhost:8000/docs
 ```
 
-ReDoc
+### ReDoc
 
 ```text
 http://localhost:8000/redoc
@@ -148,9 +186,11 @@ http://localhost:8000/redoc
 ## Development Principles
 
 - Layered architecture
-- Thin controllers
+- Thin API routers
 - Business logic in services
 - Data access in repositories
+- Dependency Injection
+- Domain exceptions separated from HTTP
 - Async-first approach
 - Type hints everywhere
 - PEP 8 compliant code
@@ -169,9 +209,11 @@ http://localhost:8000/redoc
 - [x] Pydantic schemas
 - [x] Repository layer
 - [x] Service layer
-- [ ] Dependency Injection
-- [ ] REST API endpoints
-- [ ] Validation and exception handling
+- [x] Dependency Injection
+- [x] REST API endpoints
+- [x] Validation and exception handling
+- [x] Update movie endpoint
+- [x] Delete movie endpoint
 - [ ] Unit tests
 - [ ] Integration tests
 - [ ] Logging
@@ -180,3 +222,9 @@ http://localhost:8000/redoc
 - [ ] External movie API integration
 - [ ] Recommendation engine
 - [ ] React frontend
+
+---
+
+## License
+
+This project is licensed under the MIT License.

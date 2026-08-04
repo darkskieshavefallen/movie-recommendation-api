@@ -2,7 +2,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import MovieNotFoundError
 from app.repositories.movie import MovieRepository
-from app.schemas.movie import MovieCreate, MovieRead
+from app.schemas.movie import MovieCreate, MovieRead, MovieUpdate
 
 
 class MovieService:
@@ -33,6 +33,46 @@ class MovieService:
             await self._session.refresh(orm_movie)
 
             return MovieRead.model_validate(orm_movie)
+
+        except Exception:
+            await self._session.rollback()
+            raise
+
+    async def update_movie(
+        self,
+        movie_id: int,
+        movie: MovieUpdate,
+    ) -> MovieRead:
+        """Update an existing movie and return it."""
+        try:
+            orm_movie = await self._repository.update(
+                movie_id=movie_id,
+                title=movie.title,
+                release_year=movie.release_year,
+                description=movie.description,
+            )
+
+            if orm_movie is None:
+                raise MovieNotFoundError(movie_id)
+
+            await self._session.commit()
+            await self._session.refresh(orm_movie)
+
+            return MovieRead.model_validate(orm_movie)
+
+        except Exception:
+            await self._session.rollback()
+            raise
+
+    async def delete_movie(self, movie_id: int) -> None:
+        """Delete an existing movie."""
+        try:
+            deleted = await self._repository.delete(movie_id)
+
+            if not deleted:
+                raise MovieNotFoundError(movie_id)
+
+            await self._session.commit()
 
         except Exception:
             await self._session.rollback()
