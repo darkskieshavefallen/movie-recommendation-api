@@ -67,7 +67,6 @@ class MovieService:
             )
 
             if orm_movie is None:
-                logger.warning("Movie not found for update: id=%s", movie_id)
                 raise MovieNotFoundError(movie_id)
 
             await self._session.commit()
@@ -94,7 +93,6 @@ class MovieService:
             deleted = await self._repository.delete(movie_id)
 
             if not deleted:
-                logger.warning("Movie not found for deletion: id=%s", movie_id)
                 raise MovieNotFoundError(movie_id)
 
             await self._session.commit()
@@ -116,7 +114,6 @@ class MovieService:
         orm_movie = await self._repository.get_by_id(movie_id)
 
         if orm_movie is None:
-            logger.warning("Movie not found: id=%s", movie_id)
             raise MovieNotFoundError(movie_id)
 
         return MovieRead.model_validate(orm_movie)
