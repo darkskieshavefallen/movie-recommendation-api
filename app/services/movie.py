@@ -1,8 +1,12 @@
+import logging
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import MovieNotFoundError
 from app.repositories.movie import MovieRepository
 from app.schemas.movie import MovieCreate, MovieRead, MovieUpdate
+
+logger = logging.getLogger(__name__)
 
 
 class MovieService:
@@ -32,10 +36,20 @@ class MovieService:
             await self._session.commit()
             await self._session.refresh(orm_movie)
 
+            logger.info(
+                "Movie created successfully: id=%s title=%s",
+                orm_movie.id,
+                orm_movie.title,
+            )
+
             return MovieRead.model_validate(orm_movie)
 
         except Exception:
             await self._session.rollback()
+            logger.exception(
+                "Failed to create movie: title=%s",
+                movie.title,
+            )
             raise
 
     async def update_movie(
@@ -53,15 +67,25 @@ class MovieService:
             )
 
             if orm_movie is None:
+                logger.warning("Movie not found for update: id=%s", movie_id)
                 raise MovieNotFoundError(movie_id)
 
             await self._session.commit()
             await self._session.refresh(orm_movie)
 
+            logger.info(
+                "Movie updated successfully: id=%s title=%s",
+                movie_id,
+                orm_movie.title,
+            )
+
             return MovieRead.model_validate(orm_movie)
 
+        except MovieNotFoundError:
+            raise
         except Exception:
             await self._session.rollback()
+            logger.exception("Failed to update movie: id=%s", movie_id)
             raise
 
     async def delete_movie(self, movie_id: int) -> None:
@@ -70,12 +94,18 @@ class MovieService:
             deleted = await self._repository.delete(movie_id)
 
             if not deleted:
+                logger.warning("Movie not found for deletion: id=%s", movie_id)
                 raise MovieNotFoundError(movie_id)
 
             await self._session.commit()
 
+            logger.info("Movie deleted successfully: id=%s", movie_id)
+
+        except MovieNotFoundError:
+            raise
         except Exception:
             await self._session.rollback()
+            logger.exception("Failed to delete movie: id=%s", movie_id)
             raise
 
     async def get_movie(
@@ -86,6 +116,7 @@ class MovieService:
         orm_movie = await self._repository.get_by_id(movie_id)
 
         if orm_movie is None:
+            logger.warning("Movie not found: id=%s", movie_id)
             raise MovieNotFoundError(movie_id)
 
         return MovieRead.model_validate(orm_movie)
