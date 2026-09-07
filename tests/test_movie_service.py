@@ -251,8 +251,10 @@ async def test_update_movie_success(movie_service, mock_repository, mock_session
     mock_session.rollback.assert_not_awaited()
 
 
-async def test_update_movie_not_found(movie_service, mock_repository, mock_session):
-    """Test updating a non-existent movie raises MovieNotFoundError."""
+async def test_update_movie_not_found(
+    movie_service, mock_repository, mock_session, caplog
+):
+    """Roll back a missing update without logging it as an internal error."""
     # Arrange
     movie_data = MovieUpdate(
         title="The Matrix Reloaded",
@@ -270,6 +272,8 @@ async def test_update_movie_not_found(movie_service, mock_repository, mock_sessi
     mock_repository.update.assert_awaited_once()
     mock_session.commit.assert_not_awaited()
     mock_session.rollback.assert_awaited_once()
+    mock_session.refresh.assert_not_awaited()
+    assert not caplog.records
 
 
 async def test_update_movie_rollback_on_error(
@@ -311,8 +315,10 @@ async def test_delete_movie_success(movie_service, mock_repository, mock_session
     mock_session.rollback.assert_not_awaited()
 
 
-async def test_delete_movie_not_found(movie_service, mock_repository, mock_session):
-    """Test deleting a non-existent movie raises MovieNotFoundError."""
+async def test_delete_movie_not_found(
+    movie_service, mock_repository, mock_session, caplog
+):
+    """Roll back a missing delete without logging it as an internal error."""
     # Arrange
     mock_repository.delete = AsyncMock(return_value=False)
 
@@ -324,6 +330,8 @@ async def test_delete_movie_not_found(movie_service, mock_repository, mock_sessi
     mock_repository.delete.assert_awaited_once_with(999)
     mock_session.commit.assert_not_awaited()
     mock_session.rollback.assert_awaited_once()
+    mock_session.refresh.assert_not_awaited()
+    assert not caplog.records
 
 
 async def test_delete_movie_rollback_on_error(

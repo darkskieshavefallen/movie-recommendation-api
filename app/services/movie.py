@@ -81,6 +81,8 @@ class MovieService:
             return MovieRead.model_validate(orm_movie)
 
         except MovieNotFoundError:
+            # End the transaction opened by the lookup; the API handler logs 404.
+            await self._session.rollback()
             raise
         except Exception:
             await self._session.rollback()
@@ -100,6 +102,8 @@ class MovieService:
             logger.info("Movie deleted successfully: id=%s", movie_id)
 
         except MovieNotFoundError:
+            # End the transaction opened by the lookup; the API handler logs 404.
+            await self._session.rollback()
             raise
         except Exception:
             await self._session.rollback()
