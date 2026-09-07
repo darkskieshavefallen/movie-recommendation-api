@@ -1,3 +1,5 @@
+from typing import Annotated
+
 from fastapi import APIRouter, Depends
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -21,7 +23,7 @@ async def health_check() -> dict[str, str]:
     summary="Database health check",
 )
 async def database_health_check(
-    db: AsyncSession = Depends(get_db),
+    db: Annotated[AsyncSession, Depends(get_db)],
 ) -> dict[str, str]:
     """Check database connectivity."""
     await db.execute(text("SELECT 1"))

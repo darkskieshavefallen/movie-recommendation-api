@@ -17,9 +17,9 @@ router = APIRouter(
     response_model=list[MovieRead],
 )
 async def list_movies(
+    service: Annotated[MovieService, Depends(get_movie_service)],
     offset: Annotated[int, Query(ge=0)] = 0,
     limit: Annotated[int, Query(ge=1, le=100)] = 100,
-    service: MovieService = Depends(get_movie_service),
 ) -> list[MovieRead]:
     """Return a paginated list of movies."""
     return await service.list_movies(
@@ -34,7 +34,7 @@ async def list_movies(
 )
 async def get_movie(
     movie_id: Annotated[int, Path(ge=1)],
-    service: MovieService = Depends(get_movie_service),
+    service: Annotated[MovieService, Depends(get_movie_service)],
 ) -> MovieRead:
     """Return a movie by its ID."""
     return await service.get_movie(movie_id)
@@ -47,7 +47,7 @@ async def get_movie(
 async def update_movie(
     movie_id: Annotated[int, Path(ge=1)],
     movie: MovieUpdate,
-    service: MovieService = Depends(get_movie_service),
+    service: Annotated[MovieService, Depends(get_movie_service)],
 ) -> MovieRead:
     """Update an existing movie."""
     return await service.update_movie(movie_id, movie)
@@ -59,7 +59,7 @@ async def update_movie(
 )
 async def delete_movie(
     movie_id: Annotated[int, Path(ge=1)],
-    service: MovieService = Depends(get_movie_service),
+    service: Annotated[MovieService, Depends(get_movie_service)],
 ) -> None:
     """Delete an existing movie."""
     await service.delete_movie(movie_id)
@@ -72,7 +72,7 @@ async def delete_movie(
 )
 async def create_movie(
     movie: MovieCreate,
-    service: MovieService = Depends(get_movie_service),
+    service: Annotated[MovieService, Depends(get_movie_service)],
 ) -> MovieRead:
     """Create a new movie."""
     return await service.create_movie(movie)

@@ -5,7 +5,9 @@ from alembic import context
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
+import app.models  # noqa: F401
 from app.core.settings import get_settings
+from app.models.base import Base
 
 config = context.config
 
@@ -13,9 +15,6 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 settings = get_settings()
-
-import app.models  # noqa: F401
-from app.models.base import Base
 
 # Points to the metadata of all ORM models.
 target_metadata = Base.metadata

@@ -26,6 +26,14 @@ dev = [
 [tool.ruff]
 target-version = "py313"
 
+[tool.ruff.lint]
+# Keep correctness, import sorting, Python upgrades, and bugbear checks explicit.
+extend-select = ["E4", "E7", "E9", "F", "I", "UP", "B"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["app"]
+known-third-party = ["alembic"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = "test_*.py"

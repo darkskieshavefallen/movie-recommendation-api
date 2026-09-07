@@ -231,7 +231,7 @@ Run unit tests and lint checks from the repository root (Linux/macOS):
 
 On Windows, use `.venv\Scripts\python.exe`. If cache writes are restricted, add `-p no:cacheprovider` to pytest and `--no-cache` to Ruff.
 
-Verified on 2026-09-07: all 13 unit tests pass. Update/delete explicitly roll back the lookup transaction before re-raising `MovieNotFoundError`; the API handler remains responsible for logging the 404. Ruff reports 17 findings, tracked in ANT-6. These checks do not verify a live PostgreSQL connection or full API CRUD.
+Verified on 2026-09-07: all 14 tests pass and Ruff checks pass. Update/delete explicitly roll back the lookup transaction before re-raising `MovieNotFoundError`; the API handler remains responsible for logging the 404. FastAPI dependencies use `Annotated`; a request-level test verifies the shared session and dependency cleanup. OpenAPI is unchanged after the dependency refactor. These checks do not verify a live PostgreSQL connection or full API CRUD.
 
 The current sprint starts with the transaction contract and lint fixes (ANT-5, ANT-6), followed by Dockerfile, `.dockerignore`, migration entrypoint, and Compose with PostgreSQL (ANT-7–ANT-10). The final step is a full startup/CRUD/persistence check and updated launch documentation (ANT-11). Work is grouped into one feature branch and one PR.
 
