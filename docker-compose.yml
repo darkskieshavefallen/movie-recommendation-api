@@ -1,0 +1,32 @@
+services:
+  api:
+    build: .
+    environment:
+      APP_TITLE: ${APP_TITLE:-Movie Recommendation API}
+      APP_VERSION: ${APP_VERSION:-0.1.0}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      # Docker-only development credentials; local DATABASE_URL is unchanged.
+      DATABASE_URL: postgresql+asyncpg://movie_app:movie_app_dev@db:5432/movie_recommendation
+    ports:
+      - "127.0.0.1:8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: movie_app
+      POSTGRES_PASSWORD: movie_app_dev
+      POSTGRES_DB: movie_recommendation
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+volumes:
+  postgres_data:

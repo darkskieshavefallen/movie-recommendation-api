@@ -8,11 +8,13 @@
 
 Стек: Python 3.13, FastAPI, Pydantic v2, SQLAlchemy async, asyncpg, PostgreSQL, Alembic, pytest, Ruff. Есть DI, сервисы/репозитории, обработчики ошибок и централизованное логирование. Логирование влито в main через PR #7, локальный HEAD при проверке — `70f3fa9`.
 
-Текущая точка: ANT-9 (15.4) реализована в общей ветке `feature/docker-sprint` и draft PR #8. Dockerfile и .dockerignore уже добавлены; entrypoint применяет миграции перед CMD. Следующая задача — ANT-10 (Compose с PostgreSQL). Пользователь просит двигаться строго по задачам Linear, объясняя Docker медленно, подробно и с примерами.
+Текущая точка: ANT-10 (15.5) реализована в общей ветке `feature/docker-sprint` и draft PR #8. Compose запускает API и PostgreSQL; entrypoint применяет миграции перед CMD. Следующая задача — ANT-11 (полный CRUD, сохранность данных и README). Пользователь просит двигаться строго по задачам Linear, объясняя Docker медленно, подробно и с примерами.
 
 Docker Desktop установлен и запущен при проверке ANT-7. В терминале агента команда доступна как `/Users/anton/.docker/bin/docker`; для сборки потребовалось добавить `/Applications/Docker.app/Contents/Resources/bin` в PATH команды. До появления .dockerignore использован временный tar-контекст только из Dockerfile и выбранных отслеживаемых файлов, без .env, .venv и IDE-артефактов. Запуск API с БД в контейнере ещё не проверялся. В ANT-7 прикреплены коммит, ветка и PR, оставлен русский отчёт; задача не закрывалась.
 
 ## Выявленные вопросы
+
+- 8 сентября, ANT-10: добавлен docker-compose.yml с сервисами api/db, PostgreSQL 16, healthcheck и depends_on: service_healthy, volume postgres_data. Docker-БД использует отдельные учебные реквизиты из Compose; DATABASE_URL в контейнере указывает на db, локальный .env не менялся. Порт API опубликован на 127.0.0.1:8000; порт БД на Mac не опубликован. Проверены compose config --quiet и up --build -d --wait: PostgreSQL healthy, автоматическая миграция 474e3311e20a применена, Uvicorn PID 1. /health, /health/db и /movies/ вернули 200 (список пуст). Контейнеры оставлены работающими; volume movie-recommendation-api_postgres_data создан. Полный CRUD и сохранность данных после перезапуска — ANT-11.
 
 - 8 сентября, ANT-9: добавлен исполняемый docker-entrypoint.sh с `set -e`, `alembic upgrade head` и `exec "$@"`, подключён ENTRYPOINT в Dockerfile. Реальный запуск выявил ошибку регистрации editable-пакета до копирования исходников (ModuleNotFoundError: app); исправлено повторной регистрацией `pip install --no-deps -e .` после COPY исходников. Образ ant-9 собран, 16 тестов проходят локально и в контейнере, Ruff проходит. Тесты проверяют порядок, код ошибки, аргументы с пробелами и сохранение PID через exec. Реальный Alembic при недоступной тестовой БД завершает контейнер кодом 1, Uvicorn не запускается. Успешная миграция на живой БД в контейнере ещё не проверялась; Compose и отдельный контейнер миграций не добавлялись.
 
