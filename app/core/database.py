@@ -1,4 +1,4 @@
-from typing import AsyncGenerator
+from collections.abc import AsyncGenerator
 
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
@@ -21,7 +21,7 @@ session_factory: async_sessionmaker[AsyncSession] = async_sessionmaker(
     expire_on_commit=False,
 )
 
-async def get_db() -> AsyncGenerator[AsyncSession, None]:
+async def get_db() -> AsyncGenerator[AsyncSession]:
     """Provide a database session for a single request."""
     async with session_factory() as session:
         yield session
