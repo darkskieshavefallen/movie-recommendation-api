@@ -8,11 +8,13 @@
 
 Стек: Python 3.13, FastAPI, Pydantic v2, SQLAlchemy async, asyncpg, PostgreSQL, Alembic, pytest, Ruff. Есть DI, сервисы/репозитории, обработчики ошибок и централизованное логирование. Логирование влито в main через PR #7, локальный HEAD при проверке — `70f3fa9`.
 
-Текущая точка: ANT-10 (15.5) реализована в общей ветке `feature/docker-sprint` и draft PR #8. Compose запускает API и PostgreSQL; entrypoint применяет миграции перед CMD. Следующая задача — ANT-11 (полный CRUD, сохранность данных и README). Пользователь просит двигаться строго по задачам Linear, объясняя Docker медленно, подробно и с примерами.
+Текущая точка: ANT-5–ANT-11 реализованы в общей ветке `feature/docker-sprint` и PR #8. Полный Docker smoke-сценарий проверен, README обновлён. Следующий этап — отдельное ревью PR и приёмка пользователя, затем доработки в той же ветке. Merge и закрытие задач не выполнялись. Пользователь просит двигаться строго по задачам Linear, объясняя Docker медленно, подробно и с примерами.
 
 Docker Desktop установлен и запущен при проверке ANT-7. В терминале агента команда доступна как `/Users/anton/.docker/bin/docker`; для сборки потребовалось добавить `/Applications/Docker.app/Contents/Resources/bin` в PATH команды. До появления .dockerignore использован временный tar-контекст только из Dockerfile и выбранных отслеживаемых файлов, без .env, .venv и IDE-артефактов. Запуск API с БД в контейнере ещё не проверялся. В ANT-7 прикреплены коммит, ветка и PR, оставлен русский отчёт; задача не закрывалась.
 
 ## Выявленные вопросы
+
+- 8 сентября, ANT-11: на свежем изолированном Compose-проекте movie-ant11-20260908 (порт 18000, без .env) проверены startup, healthcheck, автоматическая миграция 474e3311e20a, /health, /health/db, Swagger HTML/OpenAPI, полный CRUD и сохранность изменённой записи после down/up без удаления volume. После проверки тестовая запись удалена, тестовые контейнеры остановлены, volume сохранён. Основной проект на 8000 не затронут. Локальные pytest — 16 passed, Ruff проходит. README содержит Docker/local запуск, конфигурацию, остановку, volume и ограничения. Подробности — docs/DOCKER_VERIFICATION.md. Исторические ограничения предыдущих этапов ниже относятся к моменту их выполнения.
 
 - 8 сентября, ANT-10: добавлен docker-compose.yml с сервисами api/db, PostgreSQL 16, healthcheck и depends_on: service_healthy, volume postgres_data. Docker-БД использует отдельные учебные реквизиты из Compose; DATABASE_URL в контейнере указывает на db, локальный .env не менялся. Порт API опубликован на 127.0.0.1:8000; порт БД на Mac не опубликован. Проверены compose config --quiet и up --build -d --wait: PostgreSQL healthy, автоматическая миграция 474e3311e20a применена, Uvicorn PID 1. /health, /health/db и /movies/ вернули 200 (список пуст). Контейнеры оставлены работающими; volume movie-recommendation-api_postgres_data создан. Полный CRUD и сохранность данных после перезапуска — ANT-11.
 

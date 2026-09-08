@@ -26,7 +26,7 @@ Currently implements movie CRUD. External movie API integration and the recommen
 - Centralized configuration with pydantic-settings
 - Automatic OpenAPI & Swagger documentation
 - Code quality with Ruff
-- Test-ready architecture using pytest
+- Service, dependency, and entrypoint tests using pytest
 
 ---
 
@@ -103,14 +103,61 @@ alembic/
 
 ---
 
-## Getting Started
+## Run with Docker Compose
 
-Prerequisites: Python 3.13 and a running PostgreSQL server. Docker support is planned but is not yet implemented. Run the commands below from the repository root.
+Prerequisites: Git and Docker Desktop running (macOS/Windows), or Docker Engine with the Compose plugin (Linux). Port 8000 must be free. The first build needs Internet access to download images and Python dependencies. Local Python, a virtual environment, and a local PostgreSQL server are not required.
+
+```bash
+git clone https://github.com/darkskieshavefallen/movie-recommendation-api.git
+cd movie-recommendation-api
+git switch feature/docker-sprint # Until this sprint is merged into main.
+docker compose up --build
+```
+
+Run all Compose commands from the repository root. After the sprint is merged, the branch-switch command is no longer needed.
+
+Compose starts PostgreSQL, waits for its healthcheck, applies Alembic migrations, and then starts Uvicorn. A migration failure stops API startup. Open [Swagger UI](http://localhost:8000/docs).
+
+No `.env` file is required for Docker. Compose provides defaults for `APP_TITLE`, `APP_VERSION`, and `LOG_LEVEL`; if present, `.env` can override those values. The container receives its own `DATABASE_URL` with host `db`. Keep the local URL pointing to `localhost`; no switching is needed. `.env` is excluded from the build context.
+
+This is a development setup: the Docker database uses the explicit `movie_app` / `movie_app_dev` credentials from Compose. It is separate from any PostgreSQL database installed on your computer. PostgreSQL has no published host port; API is available only on `127.0.0.1:8000`.
+
+```bash
+# Start in the background and inspect services/logs.
+docker compose up --build -d
+docker compose ps
+docker compose logs -f api
+
+# Check the running API and its database connection.
+curl --fail http://localhost:8000/health
+curl --fail http://localhost:8000/health/db
+curl --fail http://localhost:8000/movies/
+
+# Stop and remove containers; retain the database volume.
+docker compose down
+
+# Recreate containers using the existing database.
+docker compose up -d
+```
+
+Data is stored in the named `postgres_data` volume (normally `movie-recommendation-api_postgres_data`). Keep the same Compose project name to reuse it. `docker compose down` retains this volume; `docker compose down --volumes` deletes its data. Rebuild after source changes with `docker compose up --build -d`; there are no bind mounts or automatic reload in this setup.
+
+If `docker` is not found on macOS, restart your terminal after installing Docker Desktop or add its CLI directory to the current shell:
+
+```bash
+export PATH="$HOME/.docker/bin:/Applications/Docker.app/Contents/Resources/bin:$PATH"
+```
+
+If Docker cannot connect to its engine, start Docker Desktop. If port 8000 is occupied by local Uvicorn, stop that process before starting Compose.
+
+## Run Locally without Docker
+
+Prerequisites: Python 3.13 and a running PostgreSQL server. Run the commands below from the repository root.
 
 ### 1. Clone the repository
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/darkskieshavefallen/movie-recommendation-api.git
 cd movie-recommendation-api
 ```
 
@@ -229,11 +276,18 @@ Run unit tests and lint checks from the repository root (Linux/macOS):
 .venv/bin/python -m ruff check .
 ```
 
+To run checks inside the built image without invoking startup migrations:
+
+```bash
+docker compose run --rm --no-deps --entrypoint python api -m pytest -q
+docker compose run --rm --no-deps --entrypoint python api -m ruff check .
+```
+
 On Windows, use `.venv\Scripts\python.exe`. If cache writes are restricted, add `-p no:cacheprovider` to pytest and `--no-cache` to Ruff.
 
-Verified on 2026-09-07: all 14 tests pass and Ruff checks pass. Update/delete explicitly roll back the lookup transaction before re-raising `MovieNotFoundError`; the API handler remains responsible for logging the 404. FastAPI dependencies use `Annotated`; a request-level test verifies the shared session and dependency cleanup. OpenAPI is unchanged after the dependency refactor. These checks do not verify a live PostgreSQL connection or full API CRUD.
+Verified on 2026-09-08: all 16 tests pass and Ruff checks pass. Update/delete explicitly roll back the lookup transaction before re-raising `MovieNotFoundError`; the API handler remains responsible for logging the 404. FastAPI dependencies use `Annotated`; a request-level test verifies the shared session and dependency cleanup. OpenAPI is unchanged after the dependency refactor. The unit tests do not require a live database. A separate Docker smoke check verified fresh startup, automatic migrations, health endpoints, Swagger, CRUD, and persistence after container recreation; see [verification results](docs/DOCKER_VERIFICATION.md).
 
-The current sprint starts with the transaction contract and lint fixes (ANT-5, ANT-6), followed by Dockerfile, `.dockerignore`, migration entrypoint, and Compose with PostgreSQL (ANT-7–ANT-10). The final step is a full startup/CRUD/persistence check and updated launch documentation (ANT-11). Work is grouped into one feature branch and one PR.
+The Docker sprint (ANT-5–ANT-11) is implemented in `feature/docker-sprint` and [PR #8](https://github.com/darkskieshavefallen/movie-recommendation-api/pull/8), pending review and acceptance. Each task has a separate commit.
 
 See [project context](docs/PROJECT_CONTEXT.md) for the agreed sequence and Docker decisions, and [AGENTS.md](AGENTS.md) for contributor instructions.
 
@@ -259,7 +313,7 @@ See [project context](docs/PROJECT_CONTEXT.md) for the agreed sequence and Docke
 - [x] Resolve transaction-contract test failures
 - [ ] Integration tests
 - [x] Logging
-- [ ] Docker
+- [x] Docker
 - [ ] CI/CD
 - [ ] External movie API integration
 - [ ] Recommendation engine
