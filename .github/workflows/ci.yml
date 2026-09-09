@@ -11,15 +11,17 @@ permissions:
 
 jobs:
   checks:
-    name: Checks and Docker build
+    name: Checks, Docker build and smoke test
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
       APP_TITLE: Movie Recommendation API CI
       APP_VERSION: ci
-      # Tests mock database access; no PostgreSQL service is required.
+      # Unit tests mock database access; Compose provides its own database URL.
       DATABASE_URL: postgresql+asyncpg://ci:ci@127.0.0.1:5432/movie_ci
       LOG_LEVEL: INFO
+      COMPOSE_FILE: .github/compose.ci.yml
+      COMPOSE_PROJECT_NAME: movie-ci-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
@@ -46,3 +48,22 @@ jobs:
 
       - name: Verify image is available locally
         run: docker image inspect "$CI_IMAGE" --format '{{.Id}}'
+
+      - name: Start isolated smoke services
+        id: smoke_start
+        timeout-minutes: 3
+        run: docker compose --env-file /dev/null up --no-build --wait --wait-timeout 120
+
+      - name: Verify migrations and health endpoints
+        timeout-minutes: 1
+        run: bash .github/scripts/verify-smoke.sh
+
+      - name: Collect smoke failure logs
+        if: failure() && steps.smoke_start.outcome != 'skipped'
+        timeout-minutes: 1
+        run: docker compose --env-file /dev/null logs --no-color --timestamps
+
+      - name: Clean up smoke resources
+        if: always() && steps.smoke_start.outcome != 'skipped'
+        timeout-minutes: 1
+        run: docker compose --env-file /dev/null down --volumes --remove-orphans --timeout 10
