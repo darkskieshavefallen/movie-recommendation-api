@@ -110,11 +110,10 @@ Prerequisites: Git and Docker Desktop running (macOS/Windows), or Docker Engine 
 ```bash
 git clone https://github.com/darkskieshavefallen/movie-recommendation-api.git
 cd movie-recommendation-api
-git switch feature/docker-sprint # Until this sprint is merged into main.
 docker compose up --build
 ```
 
-Run all Compose commands from the repository root. After the sprint is merged, the branch-switch command is no longer needed.
+Run all Compose commands from the repository root.
 
 Compose starts PostgreSQL, waits for its healthcheck, applies Alembic migrations, and then starts Uvicorn. A migration failure stops API startup. Open [Swagger UI](http://localhost:8000/docs).
 
@@ -287,7 +286,13 @@ On Windows, use `.venv\Scripts\python.exe`. If cache writes are restricted, add 
 
 Verified on 2026-09-08: all 16 tests pass and Ruff checks pass. Update/delete explicitly roll back the lookup transaction before re-raising `MovieNotFoundError`; the API handler remains responsible for logging the 404. FastAPI dependencies use `Annotated`; a request-level test verifies the shared session and dependency cleanup. OpenAPI is unchanged after the dependency refactor. The unit tests do not require a live database. A separate Docker smoke check verified fresh startup, automatic migrations, health endpoints, Swagger, CRUD, and persistence after container recreation; see [verification results](docs/DOCKER_VERIFICATION.md).
 
-The Docker sprint (ANT-5–ANT-11) is implemented in `feature/docker-sprint` and [PR #8](https://github.com/darkskieshavefallen/movie-recommendation-api/pull/8), pending review and acceptance. Each task has a separate commit.
+The Docker sprint (ANT-5–ANT-11) was merged into `main` through [PR #8](https://github.com/darkskieshavefallen/movie-recommendation-api/pull/8).
+
+### Continuous integration (ANT-12)
+
+[GitHub Actions workflow](.github/workflows/ci.yml) runs on pull requests targeting `main` and pushes to `main`. Its `checks` job uses a fresh GitHub-hosted Ubuntu runner with Python 3.13. Steps check out the repository, install dependencies with `python -m pip install -e ".[dev]"`, and run Ruff followed by pytest using the commands above. A failed step fails the job; failures are not ignored.
+
+The job's `env` block provides explicit non-sensitive application settings, so CI needs no `.env` file or repository secrets. The database URL is a placeholder: existing tests mock database access and require no PostgreSQL service or migrations. These checks do not verify connectivity to a real database. Docker image building and publishing belong to later tasks in the CI sprint.
 
 See [project context](docs/PROJECT_CONTEXT.md) for the agreed sequence and Docker decisions, and [AGENTS.md](AGENTS.md) for contributor instructions.
 
