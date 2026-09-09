@@ -288,11 +288,15 @@ Verified on 2026-09-08: all 16 tests pass and Ruff checks pass. Update/delete ex
 
 The Docker sprint (ANT-5–ANT-11) was merged into `main` through [PR #8](https://github.com/darkskieshavefallen/movie-recommendation-api/pull/8).
 
-### Continuous integration (ANT-12)
+### Continuous integration (ANT-12, ANT-13)
 
 [GitHub Actions workflow](.github/workflows/ci.yml) runs on pull requests targeting `main` and pushes to `main`. Its `checks` job uses a fresh GitHub-hosted Ubuntu runner with Python 3.13. Steps check out the repository, install dependencies with `python -m pip install -e ".[dev]"`, and run Ruff followed by pytest using the commands above. A failed step fails the job; failures are not ignored.
 
-The job's `env` block provides explicit non-sensitive application settings, so CI needs no `.env` file or repository secrets. The database URL is a placeholder: existing tests mock database access and require no PostgreSQL service or migrations. These checks do not verify connectivity to a real database. Docker image building and publishing belong to later tasks in the CI sprint.
+The job's `env` block provides explicit non-sensitive application settings, so CI needs no `.env` file or repository secrets. The database URL is a placeholder: existing tests mock database access and require no PostgreSQL service or migrations. These checks do not verify connectivity to a real database.
+
+After Ruff and pytest pass, the same job builds the repository's Dockerfile with `docker build --tag "$CI_IMAGE" .`; the root `.dockerignore` filters the build context. `CI_IMAGE` is set to `movie-recommendation-api:<full-commit-sha>` using `git rev-parse HEAD` and passed to subsequent steps through `GITHUB_ENV`. For a pull request, the checked-out commit is normally GitHub's temporary merge commit, so the tag identifies the code actually tested.
+
+The workflow checks that the image is present in the runner's local Docker image store with `docker image inspect`. A later smoke-check step in this same job can reuse `$CI_IMAGE` without rebuilding; a separate job would need an explicit image transfer. Build or inspection failures fail CI. Images are not published and disappear with the runner. Startup checks with PostgreSQL (ANT-14) and image publishing remain subsequent sprint tasks.
 
 See [project context](docs/PROJECT_CONTEXT.md) for the agreed sequence and Docker decisions, and [AGENTS.md](AGENTS.md) for contributor instructions.
 

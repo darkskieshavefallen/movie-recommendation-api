@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   checks:
-    name: Ruff and pytest
+    name: Checks and Docker build
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
@@ -37,3 +37,12 @@ jobs:
 
       - name: Run tests
         run: python -m pytest -q
+
+      - name: Set Docker image tag
+        run: echo "CI_IMAGE=movie-recommendation-api:$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+
+      - name: Build Docker image
+        run: docker build --tag "$CI_IMAGE" .
+
+      - name: Verify image is available locally
+        run: docker image inspect "$CI_IMAGE" --format '{{.Id}}'
