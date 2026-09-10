@@ -298,7 +298,7 @@ The pipeline runs these stages in order:
 3. Start that image with an isolated PostgreSQL service, verify the Alembic revision, and check `/health` plus `/health/db`.
 4. On pushes to `main` only, transfer the verified image to a separate job and publish it to GHCR without rebuilding.
 
-The CI badge at the top of this README reports the latest `main` workflow. Pull request checks validate stages 1–3; stage 4 remains skipped until an authorized merge creates a push to `main`. Detailed pre-merge evidence and the required first-publication checks are recorded in [CI verification](docs/CI_VERIFICATION.md).
+The CI badge at the top of this README reports the latest `main` workflow. Pull request checks validate stages 1–3 and skip publication. The first complete `main` delivery, including stage 4 and a pull-by-digest verification, succeeded after [PR #9](https://github.com/darkskieshavefallen/movie-recommendation-api/pull/9) was merged. Detailed evidence is recorded in [CI verification](docs/CI_VERIFICATION.md).
 
 [GitHub Actions workflow](.github/workflows/ci.yml) runs on pull requests targeting `main` and pushes to `main`. Its `checks` job uses a fresh GitHub-hosted Ubuntu runner with Python 3.13. Steps check out the repository, install dependencies with `python -m pip install -e ".[dev]"`, and run Ruff followed by pytest using the commands above. A failed step fails the job; failures are not ignored.
 
@@ -306,7 +306,7 @@ The job's `env` block provides explicit non-sensitive application settings, so C
 
 After Ruff and pytest pass, the same job builds the repository's Dockerfile with `docker build --tag "$CI_IMAGE" .`; the root `.dockerignore` filters the build context. `CI_IMAGE` is set to `movie-recommendation-api:<full-commit-sha>` using `git rev-parse HEAD` and passed to subsequent steps through `GITHUB_ENV`. For a pull request, the checked-out commit is normally GitHub's temporary merge commit, so the tag identifies the code actually tested.
 
-The workflow checks that the image is present in the runner's local Docker image store with `docker image inspect`. The smoke check in the same job then reuses `$CI_IMAGE` without rebuilding. Build or inspection failures fail CI. Images are not published and disappear with the runner; image publishing is a subsequent sprint task.
+The workflow checks that the image is present in the runner's local Docker image store with `docker image inspect`. The smoke check in the same job then reuses `$CI_IMAGE` without rebuilding. Build or inspection failures fail CI. On pull requests the local image disappears with the runner; on pushes to `main` the verified image continues to the publish job.
 
 The [CI Compose file](.github/compose.ci.yml) starts the built API image and PostgreSQL 16 in a unique `movie-ci-<run-id>-<attempt>` project, with its own network and disposable database volume. It uses explicit CI credentials, reads no `.env`, publishes no host ports, and preserves the image's migration entrypoint. The development `docker-compose.yml` is not used or changed.
 
@@ -342,7 +342,14 @@ printf '%s' "$CR_PAT" | docker login ghcr.io \
 
 The helper creates a unique `movie-ghcr-verify-<pid>` Compose project, pulls the selected API image, starts it with a disposable PostgreSQL database, runs the existing Alembic-head and `/health` plus `/health/db` checks, and removes its containers, network, and volume on success or failure. The API is temporarily available on `127.0.0.1:18000`; set `API_PORT` before the command if that port is occupied. Failure logs are printed before cleanup. The normal development project's containers and `postgres_data` volume use a different project name and are not touched.
 
-The first real pull can be verified only after an authorized merge triggers publication from `main`. Until then, the configuration and its refusal to build locally are reviewed in the sprint PR.
+The first real pull was verified after the Sprint 16 merge. [Main run 34481819321](https://github.com/darkskieshavefallen/movie-recommendation-api/actions/runs/34481819321) published:
+
+```text
+ghcr.io/darkskieshavefallen/movie-recommendation-api:sha-64746bbb1ea442e0ea7dff14581ab173c6a87d00
+ghcr.io/darkskieshavefallen/movie-recommendation-api@sha256:aca66f496b9eeead4fed2a17baf6f65aaecb6a87c9db9cb7ecf1c7b9b404e190
+```
+
+The helper pulled the immutable digest without a local build, started PostgreSQL and the API, confirmed Alembic revision `474e3311e20a`, received HTTP 200 from `/health` and `/health/db`, and removed its containers, network, and disposable volume.
 
 See [project context](docs/PROJECT_CONTEXT.md) for the agreed sequence and Docker decisions, and [AGENTS.md](AGENTS.md) for contributor instructions.
 
@@ -370,7 +377,7 @@ See [project context](docs/PROJECT_CONTEXT.md) for the agreed sequence and Docke
 - [x] Logging
 - [x] Docker
 - [x] CI checks, Docker build, and PostgreSQL smoke pipeline
-- [ ] GHCR publication and pull verification (implemented; requires merge to verify)
+- [x] GHCR publication and pull verification
 - [ ] Server deployment
 - [ ] External movie API integration
 - [ ] Recommendation engine
