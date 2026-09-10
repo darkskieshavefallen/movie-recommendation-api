@@ -288,7 +288,7 @@ Verified on 2026-09-08: all 16 tests pass and Ruff checks pass. Update/delete ex
 
 The Docker sprint (ANT-5–ANT-11) was merged into `main` through [PR #8](https://github.com/darkskieshavefallen/movie-recommendation-api/pull/8).
 
-### Continuous integration and image publishing (ANT-12–ANT-15)
+### Continuous integration and image publishing (ANT-12–ANT-16)
 
 [GitHub Actions workflow](.github/workflows/ci.yml) runs on pull requests targeting `main` and pushes to `main`. Its `checks` job uses a fresh GitHub-hosted Ubuntu runner with Python 3.13. Steps check out the repository, install dependencies with `python -m pip install -e ".[dev]"`, and run Ruff followed by pytest using the commands above. A failed step fails the job; failures are not ignored.
 
@@ -309,6 +309,30 @@ ghcr.io/darkskieshavefallen/movie-recommendation-api:sha-<full-commit-sha>
 ```
 
 Only the `publish` job receives `packages: write`; it logs in to GHCR with the workflow's `GITHUB_TOKEN`, so no personal token or repository secret is required. Publication is skipped when any prerequisite fails. The job summary records the tag and immutable registry digest as `<image>@sha256:<digest>`. The transfer artifact expires after one day. Deployment and a `latest` tag are outside this sprint step.
+
+### Run an exact published image
+
+The development command `docker compose up --build` still builds local source through [docker-compose.yml](docker-compose.yml). To verify a published artifact instead, use [docker-compose.ghcr.yml](docker-compose.ghcr.yml) through the bounded helper below. It contains `image:` and `pull_policy: always`, has no `build:` directive, and accepts only this repository's full `sha-<commit>` tag or registry digest:
+
+```bash
+bash .github/scripts/verify-published-image.sh \
+  ghcr.io/darkskieshavefallen/movie-recommendation-api:sha-<full-commit-sha>
+
+# The immutable digest reported by the publish job is also accepted:
+bash .github/scripts/verify-published-image.sh \
+  ghcr.io/darkskieshavefallen/movie-recommendation-api@sha256:<registry-digest>
+```
+
+The script must run from a machine with Docker and Internet access. Public GHCR packages can be pulled anonymously. For a private package, first authenticate with a GitHub personal access token (classic) that has `read:packages`; use your GitHub username and supply the token through stdin so it is not written in the command:
+
+```bash
+printf '%s' "$CR_PAT" | docker login ghcr.io \
+  --username <github-username> --password-stdin
+```
+
+The helper creates a unique `movie-ghcr-verify-<pid>` Compose project, pulls the selected API image, starts it with a disposable PostgreSQL database, runs the existing Alembic-head and `/health` plus `/health/db` checks, and removes its containers, network, and volume on success or failure. The API is temporarily available on `127.0.0.1:18000`; set `API_PORT` before the command if that port is occupied. Failure logs are printed before cleanup. The normal development project's containers and `postgres_data` volume use a different project name and are not touched.
+
+The first real pull can be verified only after an authorized merge triggers publication from `main`. Until then, the configuration and its refusal to build locally are reviewed in the sprint PR.
 
 See [project context](docs/PROJECT_CONTEXT.md) for the agreed sequence and Docker decisions, and [AGENTS.md](AGENTS.md) for contributor instructions.
 
