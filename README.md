@@ -2,6 +2,7 @@
 ![FastAPI](https://img.shields.io/badge/FastAPI-Latest-009688)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-blue)
 ![SQLAlchemy](https://img.shields.io/badge/SQLAlchemy-2.x-red)
+[![CI](https://github.com/darkskieshavefallen/movie-recommendation-api/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/darkskieshavefallen/movie-recommendation-api/actions/workflows/ci.yml)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 # Movie Recommendation API
@@ -288,7 +289,16 @@ Verified on 2026-09-08: all 16 tests pass and Ruff checks pass. Update/delete ex
 
 The Docker sprint (ANT-5–ANT-11) was merged into `main` through [PR #8](https://github.com/darkskieshavefallen/movie-recommendation-api/pull/8).
 
-### Continuous integration and image publishing (ANT-12–ANT-16)
+### Continuous integration and image publishing (ANT-12–ANT-17)
+
+The pipeline runs these stages in order:
+
+1. Install the development dependencies on Python 3.13, then run Ruff and pytest.
+2. Build the Dockerfile once and tag the image with the exact checked-out commit SHA.
+3. Start that image with an isolated PostgreSQL service, verify the Alembic revision, and check `/health` plus `/health/db`.
+4. On pushes to `main` only, transfer the verified image to a separate job and publish it to GHCR without rebuilding.
+
+The CI badge at the top of this README reports the latest `main` workflow. Pull request checks validate stages 1–3; stage 4 remains skipped until an authorized merge creates a push to `main`. Detailed pre-merge evidence and the required first-publication checks are recorded in [CI verification](docs/CI_VERIFICATION.md).
 
 [GitHub Actions workflow](.github/workflows/ci.yml) runs on pull requests targeting `main` and pushes to `main`. Its `checks` job uses a fresh GitHub-hosted Ubuntu runner with Python 3.13. Steps check out the repository, install dependencies with `python -m pip install -e ".[dev]"`, and run Ruff followed by pytest using the commands above. A failed step fails the job; failures are not ignored.
 
@@ -359,7 +369,9 @@ See [project context](docs/PROJECT_CONTEXT.md) for the agreed sequence and Docke
 - [ ] Integration tests
 - [x] Logging
 - [x] Docker
-- [ ] CI/CD
+- [x] CI checks, Docker build, and PostgreSQL smoke pipeline
+- [ ] GHCR publication and pull verification (implemented; requires merge to verify)
+- [ ] Server deployment
 - [ ] External movie API integration
 - [ ] Recommendation engine
 - [ ] React frontend
