@@ -1,6 +1,6 @@
 # Контекст проекта и текущий спринт
 
-Обновлено: 2026-09-08. Это передача контекста из проекта ChatGPT PET, чата «Dependency Injection в проекте», и локальной проверки репозитория. Факты ниже — снимок состояния, перед изменениями перепроверь их.
+Обновлено: 2026-09-10. Факты ниже — снимок состояния, перед изменениями перепроверь их.
 
 ## Цель и состояние
 
@@ -8,11 +8,27 @@
 
 Стек: Python 3.13, FastAPI, Pydantic v2, SQLAlchemy async, asyncpg, PostgreSQL, Alembic, pytest, Ruff. Есть DI, сервисы/репозитории, обработчики ошибок и централизованное логирование. Логирование влито в main через PR #7, локальный HEAD при проверке — `70f3fa9`.
 
-Текущая точка: ANT-5–ANT-11 реализованы в общей ветке `feature/docker-sprint` и PR #8. Полный Docker smoke-сценарий проверен, README обновлён. Следующий этап — отдельное ревью PR и приёмка пользователя, затем доработки в той же ветке. Merge и закрытие задач не выполнялись. Пользователь просит двигаться строго по задачам Linear, объясняя Docker медленно, подробно и с примерами.
+Текущая точка: PR #8 (ANT-5–ANT-11) влит 8 сентября. Sprint 16 — CI and Docker image publishing — ведётся в общей ветке `feature/ci-sprint` и draft PR #9: https://github.com/darkskieshavefallen/movie-recommendation-api/pull/9. ANT-12–ANT-16 опубликованы отдельными коммитами. Текущее поручение — ANT-17: итоговая проверка pipeline и документации. Merge, первая публикация GHCR и реальный pull требуют отдельного поручения пользователя и пока не выполняются.
+
+ANT-12: опубликован коммит `13352d5`, добавлен `.github/workflows/ci.yml` для PR в main и push в main: Ubuntu, Python 3.13, установка `.[dev]`, Ruff и pytest. Настройки заданы явно в env без секретов; PostgreSQL не запускается, доступ к БД подменён в существующих тестах. Локально, в копии без `.env` и на чистом GitHub runner проверки прошли: 16 тестов, Ruff. Удалённый запуск: https://github.com/darkskieshavefallen/movie-recommendation-api/actions/runs/34412395887. Ссылки на коммит, ветку и PR прикреплены к Linear. Задача не закрывалась.
+
+ANT-13: после тестов в тот же job добавлены определение `CI_IMAGE=movie-recommendation-api:<git rev-parse HEAD>`, `docker build --tag "$CI_IMAGE" .` и проверка доступности образа через `docker image inspect`. Тег передаётся следующим шагам через `GITHUB_ENV`. Сборка использует существующие Dockerfile и .dockerignore; образ доступен следующему шагу в локальном Docker runner без пересборки. Для PR тег соответствует фактически проверяемому merge-коммиту GitHub. Ошибки сборки/inspect не игнорируются. README описывает этот контракт. Проверены синтаксис YAML (Psych), shell-команд (`bash -n`) и `git diff --check`; результат удалённой сборки после отправки коммита фиксируется в PR #9 и Linear. Запуск с PostgreSQL — ANT-14, публикация образа — последующие задачи, пока не реализованы.
 
 Docker Desktop установлен и запущен при проверке ANT-7. В терминале агента команда доступна как `/Users/anton/.docker/bin/docker`; для сборки потребовалось добавить `/Applications/Docker.app/Contents/Resources/bin` в PATH команды. До появления .dockerignore использован временный tar-контекст только из Dockerfile и выбранных отслеживаемых файлов, без .env, .venv и IDE-артефактов. Запуск API с БД в контейнере ещё не проверялся. В ANT-7 прикреплены коммит, ветка и PR, оставлен русский отчёт; задача не закрывалась.
 
 ## Выявленные вопросы
+
+- ANT-17 pre-merge: README получил CI badge, явные стадии pipeline и раздельные roadmap-пункты для проверенного CI, ожидающей merge публикации/pull и будущего server deployment. Добавлен `docs/CI_VERIFICATION.md` с цепочкой доставки, накопленными run-ссылками и точным post-merge checklist. Намеренно красный run https://github.com/darkskieshavefallen/movie-recommendation-api/actions/runs/34480678535: Ruff и 16 тестов прошли, временный `exit 1` упал, Docker build/smoke/export и весь publish job были skipped. Временный шаг удалён, тот же ANT-17 commit amend-ится и `--force-with-lease` возвращает PR в зелёное состояние, сохраняя один итоговый коммит на задачу. Post-merge часть ANT-17 остаётся открытой до прямого разрешения пользователя: проверить main run, GHCR reference/digest и реальный pull/start, затем обновить фактический статус.
+- ANT-16 опубликована коммитом `3c94252`; PR CI https://github.com/darkskieshavefallen/movie-recommendation-api/actions/runs/34479175587 прошёл за 1:28, publish job skipped. Compose config и mocked-Docker сценарии подтверждены, реальный pull ждёт публикации после merge. Ссылки прикреплены к Linear.
+
+- ANT-16: добавлены standalone `docker-compose.ghcr.yml` без build и `.github/scripts/verify-published-image.sh`. Конфигурация требует APP_IMAGE с полным sha-<40 hex> тегом или sha256:<64 hex> digest, всегда делает pull, использует PostgreSQL и порт API 18000 (переопределяется API_PORT). Скрипт создаёт уникальный project `movie-ghcr-verify-<pid>`, запускает `up --pull always --no-build --wait --wait-timeout 120`, переиспользует проверку Alembic heads и обоих health endpoints, выводит логи при ошибке и через EXIT trap удаляет контейнеры, сеть и disposable volume. Dev docker-compose.yml не изменён. README описывает public/private pull и PAT classic read:packages. До merge проверяем Compose config, отсутствие build, shell-ветви и PR; фактический pull возможен только после первой разрешённой публикации из main согласно критерию ANT-16.
+- ANT-15 опубликована коммитом `283a56a`; PR CI https://github.com/darkskieshavefallen/movie-recommendation-api/actions/runs/34477878667 прошёл за 54 секунды, оба export-шага и publish job корректно skipped. Реальный push/digest ждёт merge в main. Ссылки прикреплены к Linear, PR #9 остаётся draft.
+
+- ANT-15: после успешного smoke на push в main checks job экспортирует ровно проверенный CI_IMAGE через docker save и upload-artifact (retention 1 day). Отдельный publish job с единственным `packages: write` скачивает artifact, делает docker load, сверяет image ID с output checks job, назначает `ghcr.io/darkskieshavefallen/movie-recommendation-api:sha-<checked_sha>` и отправляет через GITHUB_TOKEN без пересборки. Затем `docker buildx imagetools inspect` читает registry digest; image@digest пишется в job summary и outputs. В PR оба шага экспорта и весь publish job пропускаются, поэтому запись в GHCR возможна только после успешного push в main. Локально проверяем YAML/shell и PR skip; реальную аутентификацию, push, digest и создаваемый package можно подтвердить только после merge, который требует отдельного поручения пользователя.
+- ANT-14 опубликована коммитом `a0534d8`; CI https://github.com/darkskieshavefallen/movie-recommendation-api/actions/runs/34414022339 прошёл за 52 секунды. PostgreSQL и API стали healthy, expected/actual Alembic revision — `474e3311e20a`, /health и /health/db вернули 200. Cleanup удалил оба контейнера, сеть и volume. Ссылки прикреплены к Linear, PR #9 остаётся draft.
+
+- ANT-14: текущее поручение после ANT-13 — проверка запуска с PostgreSQL в CI. Добавлены `.github/compose.ci.yml` и `.github/scripts/verify-smoke.sh`; workflow запускает уже собранный CI_IMAGE без пересборки, с исходным entrypoint и отдельной PostgreSQL 16. Проект `movie-ci-<run-id>-<attempt>` изолирует сеть и disposable volume, порты не публикуются, .env не читается. `up --wait --wait-timeout 120` ожидает healthchecks; скрипт сравнивает реальные ревизии БД с Alembic heads образа и требует 200 от /health и /health/db. На сбое выводятся логи, always-cleanup удаляет только ресурсы CI-проекта. Локально прошли Compose config, YAML parsing, bash -n и пять проверок скрипта с подменённым Docker (успех, несовпадение ревизии, пустой head, ошибка БД, ошибка HTTP); ошибки сохраняют ненулевой код. Локальный Docker daemon выключен; реальные результаты GitHub runner записываются в PR #9 и Linear после отправки. CRUD и публикация образа не входят в ANT-14.
+- ANT-13 опубликована коммитом `c7b4182`; CI https://github.com/darkskieshavefallen/movie-recommendation-api/actions/runs/34413058681 прошёл за 39 секунд: Ruff, 16 тестов, сборка и inspect. Тег совпал с SHA checkout `778a33b9c627eadce5e46d4f255c7167b687b972`, ID собранного образа совпал с результатом inspect. Ссылки прикреплены к Linear, общий PR #9 остаётся draft.
 
 - 8 сентября, ANT-11: на свежем изолированном Compose-проекте movie-ant11-20260908 (порт 18000, без .env) проверены startup, healthcheck, автоматическая миграция 474e3311e20a, /health, /health/db, Swagger HTML/OpenAPI, полный CRUD и сохранность изменённой записи после down/up без удаления volume. После проверки тестовая запись удалена, тестовые контейнеры остановлены, volume сохранён. Основной проект на 8000 не затронут. Локальные pytest — 16 passed, Ruff проходит. README содержит Docker/local запуск, конфигурацию, остановку, volume и ограничения. Подробности — docs/DOCKER_VERIFICATION.md. Исторические ограничения предыдущих этапов ниже относятся к моменту их выполнения.
 
@@ -46,7 +62,11 @@ Docker Desktop установлен и запущен при проверке AN
 | ANT-10 | 15.5: Compose с PostgreSQL | ANT-9 |
 | ANT-11 | 15.6: полный запуск, smoke-проверка и README | ANT-10 |
 
-## Организация спринта
+## Организация CI-спринта
+
+Общая ветка — `feature/ci-sprint`. По уточнению пользователя после каждой выполненной задачи обязательно создаём отдельный коммит с ANT-идентификатором, отправляем ветку и поддерживаем общий draft PR спринта, без повторного согласования. ANT-12 фиксируется отдельным коммитом; после публикации проверяем Actions на GitHub и прикрепляем ссылки в Linear. Merge и закрытие задач остаются отдельным поручением пользователя.
+
+## Организация Docker-спринта (завершён, история)
 
 Одна ветка `feature/docker-sprint` от `main` и один PR на весь текущий спринт подготовки и Docker. По решению пользователя на каждую задачу ANT-5–ANT-11 создаётся отдельный коммит. После реализации задачи в Linear добавляется комментарий по-русски с результатами проверок и ссылкой на коммит.
 

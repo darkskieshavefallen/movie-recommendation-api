@@ -2,6 +2,7 @@
 ![FastAPI](https://img.shields.io/badge/FastAPI-Latest-009688)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-blue)
 ![SQLAlchemy](https://img.shields.io/badge/SQLAlchemy-2.x-red)
+[![CI](https://github.com/darkskieshavefallen/movie-recommendation-api/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/darkskieshavefallen/movie-recommendation-api/actions/workflows/ci.yml)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 # Movie Recommendation API
@@ -110,11 +111,10 @@ Prerequisites: Git and Docker Desktop running (macOS/Windows), or Docker Engine 
 ```bash
 git clone https://github.com/darkskieshavefallen/movie-recommendation-api.git
 cd movie-recommendation-api
-git switch feature/docker-sprint # Until this sprint is merged into main.
 docker compose up --build
 ```
 
-Run all Compose commands from the repository root. After the sprint is merged, the branch-switch command is no longer needed.
+Run all Compose commands from the repository root.
 
 Compose starts PostgreSQL, waits for its healthcheck, applies Alembic migrations, and then starts Uvicorn. A migration failure stops API startup. Open [Swagger UI](http://localhost:8000/docs).
 
@@ -287,7 +287,62 @@ On Windows, use `.venv\Scripts\python.exe`. If cache writes are restricted, add 
 
 Verified on 2026-09-08: all 16 tests pass and Ruff checks pass. Update/delete explicitly roll back the lookup transaction before re-raising `MovieNotFoundError`; the API handler remains responsible for logging the 404. FastAPI dependencies use `Annotated`; a request-level test verifies the shared session and dependency cleanup. OpenAPI is unchanged after the dependency refactor. The unit tests do not require a live database. A separate Docker smoke check verified fresh startup, automatic migrations, health endpoints, Swagger, CRUD, and persistence after container recreation; see [verification results](docs/DOCKER_VERIFICATION.md).
 
-The Docker sprint (ANT-5–ANT-11) is implemented in `feature/docker-sprint` and [PR #8](https://github.com/darkskieshavefallen/movie-recommendation-api/pull/8), pending review and acceptance. Each task has a separate commit.
+The Docker sprint (ANT-5–ANT-11) was merged into `main` through [PR #8](https://github.com/darkskieshavefallen/movie-recommendation-api/pull/8).
+
+### Continuous integration and image publishing (ANT-12–ANT-17)
+
+The pipeline runs these stages in order:
+
+1. Install the development dependencies on Python 3.13, then run Ruff and pytest.
+2. Build the Dockerfile once and tag the image with the exact checked-out commit SHA.
+3. Start that image with an isolated PostgreSQL service, verify the Alembic revision, and check `/health` plus `/health/db`.
+4. On pushes to `main` only, transfer the verified image to a separate job and publish it to GHCR without rebuilding.
+
+The CI badge at the top of this README reports the latest `main` workflow. Pull request checks validate stages 1–3; stage 4 remains skipped until an authorized merge creates a push to `main`. Detailed pre-merge evidence and the required first-publication checks are recorded in [CI verification](docs/CI_VERIFICATION.md).
+
+[GitHub Actions workflow](.github/workflows/ci.yml) runs on pull requests targeting `main` and pushes to `main`. Its `checks` job uses a fresh GitHub-hosted Ubuntu runner with Python 3.13. Steps check out the repository, install dependencies with `python -m pip install -e ".[dev]"`, and run Ruff followed by pytest using the commands above. A failed step fails the job; failures are not ignored.
+
+The job's `env` block provides explicit non-sensitive application settings, so CI needs no `.env` file or repository secrets. The database URL is a placeholder: existing tests mock database access and require no PostgreSQL service or migrations. These checks do not verify connectivity to a real database.
+
+After Ruff and pytest pass, the same job builds the repository's Dockerfile with `docker build --tag "$CI_IMAGE" .`; the root `.dockerignore` filters the build context. `CI_IMAGE` is set to `movie-recommendation-api:<full-commit-sha>` using `git rev-parse HEAD` and passed to subsequent steps through `GITHUB_ENV`. For a pull request, the checked-out commit is normally GitHub's temporary merge commit, so the tag identifies the code actually tested.
+
+The workflow checks that the image is present in the runner's local Docker image store with `docker image inspect`. The smoke check in the same job then reuses `$CI_IMAGE` without rebuilding. Build or inspection failures fail CI. Images are not published and disappear with the runner; image publishing is a subsequent sprint task.
+
+The [CI Compose file](.github/compose.ci.yml) starts the built API image and PostgreSQL 16 in a unique `movie-ci-<run-id>-<attempt>` project, with its own network and disposable database volume. It uses explicit CI credentials, reads no `.env`, publishes no host ports, and preserves the image's migration entrypoint. The development `docker-compose.yml` is not used or changed.
+
+`docker compose up --no-build --wait --wait-timeout 120` waits for database and API healthchecks. The [verification script](.github/scripts/verify-smoke.sh) compares the database's `alembic_version` rows with the image's Alembic heads, then requires HTTP 200 from both `/health` and `/health/db` inside the API container. HTTP requests have five-second timeouts; startup and verification steps also have workflow time limits. Any failure fails CI. Failure logs are printed to the Actions log before cleanup; an `always()` step removes the CI project's containers, network, and database volume on success or failure. This smoke check verifies startup and connectivity, not full CRUD behavior.
+
+For pull requests, CI stops after the smoke check and never authenticates to a registry or publishes an image. After a successful push to `main`, the checks job exports that same verified local image as a short-lived workflow artifact. A separate `publish` job downloads and loads it, verifies its Docker image ID, and pushes it without rebuilding to:
+
+```text
+ghcr.io/darkskieshavefallen/movie-recommendation-api:sha-<full-commit-sha>
+```
+
+Only the `publish` job receives `packages: write`; it logs in to GHCR with the workflow's `GITHUB_TOKEN`, so no personal token or repository secret is required. Publication is skipped when any prerequisite fails. The job summary records the tag and immutable registry digest as `<image>@sha256:<digest>`. The transfer artifact expires after one day. Deployment and a `latest` tag are outside this sprint step.
+
+### Run an exact published image
+
+The development command `docker compose up --build` still builds local source through [docker-compose.yml](docker-compose.yml). To verify a published artifact instead, use [docker-compose.ghcr.yml](docker-compose.ghcr.yml) through the bounded helper below. It contains `image:` and `pull_policy: always`, has no `build:` directive, and accepts only this repository's full `sha-<commit>` tag or registry digest:
+
+```bash
+bash .github/scripts/verify-published-image.sh \
+  ghcr.io/darkskieshavefallen/movie-recommendation-api:sha-<full-commit-sha>
+
+# The immutable digest reported by the publish job is also accepted:
+bash .github/scripts/verify-published-image.sh \
+  ghcr.io/darkskieshavefallen/movie-recommendation-api@sha256:<registry-digest>
+```
+
+The script must run from a machine with Docker and Internet access. Public GHCR packages can be pulled anonymously. For a private package, first authenticate with a GitHub personal access token (classic) that has `read:packages`; use your GitHub username and supply the token through stdin so it is not written in the command:
+
+```bash
+printf '%s' "$CR_PAT" | docker login ghcr.io \
+  --username <github-username> --password-stdin
+```
+
+The helper creates a unique `movie-ghcr-verify-<pid>` Compose project, pulls the selected API image, starts it with a disposable PostgreSQL database, runs the existing Alembic-head and `/health` plus `/health/db` checks, and removes its containers, network, and volume on success or failure. The API is temporarily available on `127.0.0.1:18000`; set `API_PORT` before the command if that port is occupied. Failure logs are printed before cleanup. The normal development project's containers and `postgres_data` volume use a different project name and are not touched.
+
+The first real pull can be verified only after an authorized merge triggers publication from `main`. Until then, the configuration and its refusal to build locally are reviewed in the sprint PR.
 
 See [project context](docs/PROJECT_CONTEXT.md) for the agreed sequence and Docker decisions, and [AGENTS.md](AGENTS.md) for contributor instructions.
 
@@ -314,7 +369,9 @@ See [project context](docs/PROJECT_CONTEXT.md) for the agreed sequence and Docke
 - [ ] Integration tests
 - [x] Logging
 - [x] Docker
-- [ ] CI/CD
+- [x] CI checks, Docker build, and PostgreSQL smoke pipeline
+- [ ] GHCR publication and pull verification (implemented; requires merge to verify)
+- [ ] Server deployment
 - [ ] External movie API integration
 - [ ] Recommendation engine
 - [ ] React frontend
