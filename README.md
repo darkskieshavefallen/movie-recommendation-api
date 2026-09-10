@@ -288,7 +288,7 @@ Verified on 2026-09-08: all 16 tests pass and Ruff checks pass. Update/delete ex
 
 The Docker sprint (ANT-5–ANT-11) was merged into `main` through [PR #8](https://github.com/darkskieshavefallen/movie-recommendation-api/pull/8).
 
-### Continuous integration (ANT-12–ANT-14)
+### Continuous integration and image publishing (ANT-12–ANT-15)
 
 [GitHub Actions workflow](.github/workflows/ci.yml) runs on pull requests targeting `main` and pushes to `main`. Its `checks` job uses a fresh GitHub-hosted Ubuntu runner with Python 3.13. Steps check out the repository, install dependencies with `python -m pip install -e ".[dev]"`, and run Ruff followed by pytest using the commands above. A failed step fails the job; failures are not ignored.
 
@@ -301,6 +301,14 @@ The workflow checks that the image is present in the runner's local Docker image
 The [CI Compose file](.github/compose.ci.yml) starts the built API image and PostgreSQL 16 in a unique `movie-ci-<run-id>-<attempt>` project, with its own network and disposable database volume. It uses explicit CI credentials, reads no `.env`, publishes no host ports, and preserves the image's migration entrypoint. The development `docker-compose.yml` is not used or changed.
 
 `docker compose up --no-build --wait --wait-timeout 120` waits for database and API healthchecks. The [verification script](.github/scripts/verify-smoke.sh) compares the database's `alembic_version` rows with the image's Alembic heads, then requires HTTP 200 from both `/health` and `/health/db` inside the API container. HTTP requests have five-second timeouts; startup and verification steps also have workflow time limits. Any failure fails CI. Failure logs are printed to the Actions log before cleanup; an `always()` step removes the CI project's containers, network, and database volume on success or failure. This smoke check verifies startup and connectivity, not full CRUD behavior.
+
+For pull requests, CI stops after the smoke check and never authenticates to a registry or publishes an image. After a successful push to `main`, the checks job exports that same verified local image as a short-lived workflow artifact. A separate `publish` job downloads and loads it, verifies its Docker image ID, and pushes it without rebuilding to:
+
+```text
+ghcr.io/darkskieshavefallen/movie-recommendation-api:sha-<full-commit-sha>
+```
+
+Only the `publish` job receives `packages: write`; it logs in to GHCR with the workflow's `GITHUB_TOKEN`, so no personal token or repository secret is required. Publication is skipped when any prerequisite fails. The job summary records the tag and immutable registry digest as `<image>@sha256:<digest>`. The transfer artifact expires after one day. Deployment and a `latest` tag are outside this sprint step.
 
 See [project context](docs/PROJECT_CONTEXT.md) for the agreed sequence and Docker decisions, and [AGENTS.md](AGENTS.md) for contributor instructions.
 
