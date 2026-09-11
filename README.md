@@ -106,11 +106,13 @@ alembic/
 
 ## Run with Docker Compose
 
-Prerequisites: Git and Docker Desktop running (macOS/Windows), or Docker Engine with the Compose plugin (Linux). Port 8000 must be free. The first build needs Internet access to download images and Python dependencies. Local Python, a virtual environment, and a local PostgreSQL server are not required.
+Prerequisites: Git, a TMDB API Read Access Token, and Docker Desktop running (macOS/Windows), or Docker Engine with the Compose plugin (Linux). Port 8000 must be free. The first build needs Internet access to download images and Python dependencies. Local Python, a virtual environment, and a local PostgreSQL server are not required.
 
 ```bash
 git clone https://github.com/darkskieshavefallen/movie-recommendation-api.git
 cd movie-recommendation-api
+cp .env.example .env
+# Replace TMDB_READ_ACCESS_TOKEN in .env with your own token.
 docker compose up --build
 ```
 
@@ -118,7 +120,7 @@ Run all Compose commands from the repository root.
 
 Compose starts PostgreSQL, waits for its healthcheck, applies Alembic migrations, and then starts Uvicorn. A migration failure stops API startup. Open [Swagger UI](http://localhost:8000/docs).
 
-No `.env` file is required for Docker. Compose provides defaults for `APP_TITLE`, `APP_VERSION`, and `LOG_LEVEL`; if present, `.env` can override those values. The container receives its own `DATABASE_URL` with host `db`. Keep the local URL pointing to `localhost`; no switching is needed. `.env` is excluded from the build context.
+Docker Compose requires `TMDB_READ_ACCESS_TOKEN` from the shell environment or the local `.env` file; the value is passed to the container at runtime and is not stored in the image or Compose file. Compose provides safe defaults for `TMDB_BASE_URL`, `TMDB_TIMEOUT_SECONDS`, `APP_TITLE`, `APP_VERSION`, and `LOG_LEVEL`. The container receives its own `DATABASE_URL` with host `db`. Keep the local URL pointing to `localhost`; no switching is needed. `.env` is excluded from the build context.
 
 This is a development setup: the Docker database uses the explicit `movie_app` / `movie_app_dev` credentials from Compose. It is separate from any PostgreSQL database installed on your computer. PostgreSQL has no published host port; API is available only on `127.0.0.1:8000`.
 
@@ -207,6 +209,8 @@ postgresql+asyncpg://movie_app:<your-password>@localhost:5432/movie_recommendati
 ```
 
 URL-encode special characters in the password. Keep `.env` local. Settings load it relative to the working directory; migrations create tables, but do not create the PostgreSQL role or database.
+
+Request a TMDB API Read Access Token from your TMDB account settings and replace the safe `TMDB_READ_ACCESS_TOKEN` placeholder. `TMDB_BASE_URL` must be an HTTPS URL without embedded credentials, query, or fragment. `TMDB_TIMEOUT_SECONDS` must be a finite positive number. Missing or invalid required values stop application startup with a Pydantic validation error that names the affected setting.
 
 ### 6. Apply database migrations
 
@@ -302,7 +306,7 @@ The CI badge at the top of this README reports the latest `main` workflow. Pull 
 
 [GitHub Actions workflow](.github/workflows/ci.yml) runs on pull requests targeting `main` and pushes to `main`. Its `checks` job uses a fresh GitHub-hosted Ubuntu runner with Python 3.13. Steps check out the repository, install dependencies with `python -m pip install -e ".[dev]"`, and run Ruff followed by pytest using the commands above. A failed step fails the job; failures are not ignored.
 
-The job's `env` block provides explicit non-sensitive application settings, so CI needs no `.env` file or repository secrets. The database URL is a placeholder: existing tests mock database access and require no PostgreSQL service or migrations. These checks do not verify connectivity to a real database.
+The job's `env` block provides explicit non-sensitive application settings, including a fake TMDB URL and token, so CI needs no `.env` file or repository secrets and never contacts the real provider. The database URL is also a placeholder: existing unit tests mock database access and require no PostgreSQL service or migrations.
 
 After Ruff and pytest pass, the same job builds the repository's Dockerfile with `docker build --tag "$CI_IMAGE" .`; the root `.dockerignore` filters the build context. `CI_IMAGE` is set to `movie-recommendation-api:<full-commit-sha>` using `git rev-parse HEAD` and passed to subsequent steps through `GITHUB_ENV`. For a pull request, the checked-out commit is normally GitHub's temporary merge commit, so the tag identifies the code actually tested.
 
@@ -333,7 +337,7 @@ bash .github/scripts/verify-published-image.sh \
   ghcr.io/darkskieshavefallen/movie-recommendation-api@sha256:<registry-digest>
 ```
 
-The script must run from a machine with Docker and Internet access. Public GHCR packages can be pulled anonymously. For a private package, first authenticate with a GitHub personal access token (classic) that has `read:packages`; use your GitHub username and supply the token through stdin so it is not written in the command:
+The script must run from a machine with Docker and Internet access, and `TMDB_READ_ACCESS_TOKEN` must be available in its shell environment. Public GHCR packages can be pulled anonymously. For a private package, first authenticate with a GitHub personal access token (classic) that has `read:packages`; use your GitHub username and supply the token through stdin so it is not written in the command:
 
 ```bash
 printf '%s' "$CR_PAT" | docker login ghcr.io \
@@ -350,6 +354,10 @@ ghcr.io/darkskieshavefallen/movie-recommendation-api@sha256:aca66f496b9eeead4fed
 ```
 
 The helper pulled the immutable digest without a local build, started PostgreSQL and the API, confirmed Alembic revision `474e3311e20a`, received HTTP 200 from `/health` and `/health/db`, and removed its containers, network, and disposable volume.
+
+### Current sprint: external movie catalog
+
+Sprint 17 adds provider-independent, read-only movie search. ANT-18 selects TMDB API v3 and defines the smallest application contract, field mapping, error behavior, attribution requirements, and usage boundaries in [the external catalog decision](docs/EXTERNAL_MOVIE_API.md). ANT-19 adds validated provider settings and runtime-only token injection. ANT-20 defines the validated application schemas for search terms, normalized matches, and a stable result envelope. ANT-21 adds a reusable asynchronous TMDB client that translates mocked provider payloads into those schemas; provider error mapping and the endpoint remain later sprint tasks.
 
 See [project context](docs/PROJECT_CONTEXT.md) for the agreed sequence and Docker decisions, and [AGENTS.md](AGENTS.md) for contributor instructions.
 
