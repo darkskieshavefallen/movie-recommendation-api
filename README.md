@@ -351,6 +351,10 @@ ghcr.io/darkskieshavefallen/movie-recommendation-api@sha256:aca66f496b9eeead4fed
 
 The helper pulled the immutable digest without a local build, started PostgreSQL and the API, confirmed Alembic revision `474e3311e20a`, received HTTP 200 from `/health` and `/health/db`, and removed its containers, network, and disposable volume.
 
+### Current sprint: external movie catalog
+
+Sprint 17 adds provider-independent, read-only movie search. ANT-18 selects TMDB API v3 and defines the smallest application contract, field mapping, error behavior, attribution requirements, and usage boundaries in [the external catalog decision](docs/EXTERNAL_MOVIE_API.md). Production integration and credentials are intentionally deferred to the following sprint tasks.
+
 See [project context](docs/PROJECT_CONTEXT.md) for the agreed sequence and Docker decisions, and [AGENTS.md](AGENTS.md) for contributor instructions.
 
 ---
