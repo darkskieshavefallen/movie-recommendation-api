@@ -357,7 +357,7 @@ The helper pulled the immutable digest without a local build, started PostgreSQL
 
 ### Current sprint: external movie catalog
 
-Sprint 17 adds provider-independent, read-only movie search. ANT-18 selects TMDB API v3 and defines the smallest application contract, field mapping, error behavior, attribution requirements, and usage boundaries in [the external catalog decision](docs/EXTERNAL_MOVIE_API.md). ANT-19 adds validated provider settings and runtime-only token injection. ANT-20 defines the validated application schemas for search terms, normalized matches, and a stable result envelope; the async client and endpoint remain later sprint tasks.
+Sprint 17 adds provider-independent, read-only movie search. ANT-18 selects TMDB API v3 and defines the smallest application contract, field mapping, error behavior, attribution requirements, and usage boundaries in [the external catalog decision](docs/EXTERNAL_MOVIE_API.md). ANT-19 adds validated provider settings and runtime-only token injection. ANT-20 defines the validated application schemas for search terms, normalized matches, and a stable result envelope. ANT-21 adds a reusable asynchronous TMDB client that translates mocked provider payloads into those schemas; provider error mapping and the endpoint remain later sprint tasks.
 
 See [project context](docs/PROJECT_CONTEXT.md) for the agreed sequence and Docker decisions, and [AGENTS.md](AGENTS.md) for contributor instructions.
 
