@@ -38,7 +38,7 @@ page=1
 
 Only the first provider page is required in Sprint 17. Search, details, images, genres, and discovery must not be combined speculatively. `GET /3/movie/{movie_id}` is not needed because the search payload already supplies the minimal application fields.
 
-The base URL, read access token, and timeout will be application settings in ANT-19. The token remains in the request header, local environment, and deployment secret storage; it must not appear in source control, logs, exception text, or query strings.
+ANT-19 exposes the base URL, read access token, and timeout as the required `TMDB_BASE_URL`, `TMDB_READ_ACCESS_TOKEN`, and `TMDB_TIMEOUT_SECONDS` application settings. The token remains in the request header, local environment, and deployment secret storage; it must not appear in source control, logs, exception text, or query strings.
 
 ## Application search contract
 
