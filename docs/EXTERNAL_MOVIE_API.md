@@ -96,6 +96,8 @@ Integration code will raise application-owned exceptions. The API layer will map
 
 These mappings distinguish problems the caller can fix from failures at the external boundary. Logs may include the provider status and application error category, but never credentials or raw response bodies.
 
+Every external-provider failure uses the same public body shape, `{"detail": "<safe application message>"}`. The message identifies the application-owned category without including the provider body, request URL, query, credential, or HTTPX exception text. A `429` response forwards `Retry-After` only when the provider supplies a non-negative integer number of seconds. Logs contain the category code, application method and path, and provider status when available; query strings are excluded.
+
 ## Attribution and operating boundaries
 
 Before the endpoint is exposed outside local development, the product must include an approved TMDB logo and this required notice in an About or Credits surface:

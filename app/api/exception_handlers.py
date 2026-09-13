@@ -3,7 +3,16 @@ import logging
 from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
 
-from app.core.exceptions import MovieNotFoundError
+from app.core.exceptions import (
+    ExternalMovieAuthenticationError,
+    ExternalMovieInvalidResponseError,
+    ExternalMovieProviderError,
+    ExternalMovieRateLimitError,
+    ExternalMovieRequestError,
+    ExternalMovieTimeoutError,
+    ExternalMovieUnavailableError,
+    MovieNotFoundError,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +32,42 @@ async def movie_not_found_exception_handler(
     return JSONResponse(
         status_code=status.HTTP_404_NOT_FOUND,
         content={"detail": str(exc)},
+    )
+
+
+async def external_movie_provider_exception_handler(
+    request: Request,
+    exc: ExternalMovieProviderError,
+) -> JSONResponse:
+    """Map external movie failures to stable responses without provider details."""
+    status_by_error = {
+        ExternalMovieAuthenticationError: status.HTTP_502_BAD_GATEWAY,
+        ExternalMovieRateLimitError: status.HTTP_503_SERVICE_UNAVAILABLE,
+        ExternalMovieTimeoutError: status.HTTP_504_GATEWAY_TIMEOUT,
+        ExternalMovieUnavailableError: status.HTTP_503_SERVICE_UNAVAILABLE,
+        ExternalMovieInvalidResponseError: status.HTTP_502_BAD_GATEWAY,
+        ExternalMovieRequestError: status.HTTP_502_BAD_GATEWAY,
+    }
+    response_status = status_by_error.get(
+        type(exc), status.HTTP_502_BAD_GATEWAY
+    )
+    headers = None
+    if isinstance(exc, ExternalMovieRateLimitError) and exc.retry_after:
+        headers = {"Retry-After": exc.retry_after}
+
+    logger.warning(
+        "External movie provider failure: code=%s method=%s path=%s "
+        "provider_status=%s",
+        exc.code,
+        request.method,
+        request.url.path,
+        exc.provider_status,
+    )
+
+    return JSONResponse(
+        status_code=response_status,
+        content={"detail": str(exc)},
+        headers=headers,
     )
 
 
@@ -48,6 +93,10 @@ def register_exception_handlers(app: FastAPI) -> None:
     app.add_exception_handler(
         MovieNotFoundError,
         movie_not_found_exception_handler,
+    )
+    app.add_exception_handler(
+        ExternalMovieProviderError,
+        external_movie_provider_exception_handler,
     )
     app.add_exception_handler(
         Exception,

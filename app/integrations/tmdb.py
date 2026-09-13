@@ -6,6 +6,14 @@ from typing import Annotated, Self
 import httpx
 from pydantic import BaseModel, ConfigDict, StrictInt, StringConstraints
 
+from app.core.exceptions import (
+    ExternalMovieAuthenticationError,
+    ExternalMovieInvalidResponseError,
+    ExternalMovieRateLimitError,
+    ExternalMovieRequestError,
+    ExternalMovieTimeoutError,
+    ExternalMovieUnavailableError,
+)
 from app.core.settings import Settings
 from app.schemas.external_movie import (
     ExternalMovieSearchQuery,
@@ -17,6 +25,7 @@ TmdbRequiredText = Annotated[
     str,
     StringConstraints(strip_whitespace=True, min_length=1),
 ]
+MAX_RETRY_AFTER_DIGITS = 10
 
 
 class TmdbMovieResult(BaseModel):
@@ -83,27 +92,73 @@ class TmdbMovieClient:
         search: ExternalMovieSearchQuery,
     ) -> ExternalMovieSearchResponse:
         """Search the first TMDB result page and normalize every match."""
-        response = await self._http_client.get(
-            "search/movie",
-            params={
-                "query": search.query,
-                "include_adult": "false",
-                "language": "en-US",
-                "page": "1",
-            },
-        )
-        response.raise_for_status()
+        try:
+            response = await self._http_client.get(
+                "search/movie",
+                params={
+                    "query": search.query,
+                    "include_adult": "false",
+                    "language": "en-US",
+                    "page": "1",
+                },
+            )
+        except httpx.TimeoutException:
+            raise ExternalMovieTimeoutError() from None
+        except httpx.RequestError:
+            raise ExternalMovieUnavailableError() from None
 
-        provider_response = TmdbMovieSearchResponse.model_validate(
-            response.json()
-        )
-        return ExternalMovieSearchResponse(
-            query=search.query,
-            results=[
-                self._normalize_result(result)
-                for result in provider_response.results
-            ],
-        )
+        self._raise_for_provider_status(response)
+
+        try:
+            provider_response = TmdbMovieSearchResponse.model_validate(
+                response.json()
+            )
+            return ExternalMovieSearchResponse(
+                query=search.query,
+                results=[
+                    self._normalize_result(result)
+                    for result in provider_response.results
+                ],
+            )
+        except ValueError:
+            raise ExternalMovieInvalidResponseError(
+                provider_status=response.status_code
+            ) from None
+
+    @staticmethod
+    def _raise_for_provider_status(response: httpx.Response) -> None:
+        """Translate provider HTTP statuses without retaining its response body."""
+        status_code = response.status_code
+        if status_code in {401, 403}:
+            raise ExternalMovieAuthenticationError(
+                provider_status=status_code
+            )
+        if status_code == 429:
+            raise ExternalMovieRateLimitError(
+                retry_after=TmdbMovieClient._retry_after(
+                    response.headers.get("Retry-After")
+                )
+            )
+        if status_code == 504:
+            raise ExternalMovieTimeoutError(provider_status=status_code)
+        if status_code >= 500:
+            raise ExternalMovieUnavailableError(provider_status=status_code)
+        if status_code >= 400:
+            raise ExternalMovieRequestError(provider_status=status_code)
+
+    @staticmethod
+    def _retry_after(value: str | None) -> str | None:
+        """Allow only a non-negative integer delay from Retry-After."""
+        if value is None:
+            return None
+        normalized = value.strip()
+        if (
+            len(normalized) <= MAX_RETRY_AFTER_DIGITS
+            and normalized.isascii()
+            and normalized.isdecimal()
+        ):
+            return str(int(normalized))
+        return None
 
     @staticmethod
     def _normalize_result(result: TmdbMovieResult) -> ExternalMovieSearchResult:
