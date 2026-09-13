@@ -1,11 +1,12 @@
 """Tests for public handling of external movie provider failures."""
 
-import logging
+from unittest.mock import patch
 
 import pytest
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 
+from app.api import exception_handlers
 from app.api.exception_handlers import register_exception_handlers
 from app.core.exceptions import (
     ExternalMovieAuthenticationError,
@@ -64,7 +65,6 @@ async def test_external_failure_has_safe_stable_response_and_log(
     expected_status,
     expected_detail,
     retry_after,
-    caplog,
 ):
     """Every provider category maps without exposing query or credentials."""
     app = FastAPI()
@@ -75,7 +75,7 @@ async def test_external_failure_has_safe_stable_response_and_log(
 
     register_exception_handlers(app)
 
-    with caplog.at_level(logging.WARNING, logger="app.api.exception_handlers"):
+    with patch.object(exception_handlers.logger, "warning") as log_warning:
         async with AsyncClient(
             transport=ASGITransport(app=app, raise_app_exceptions=False),
             base_url="http://test",
@@ -91,12 +91,14 @@ async def test_external_failure_has_safe_stable_response_and_log(
     else:
         assert response.headers["Retry-After"] == retry_after
 
-    assert f"code={error.code}" in caplog.text
-    assert "method=GET" in caplog.text
-    assert "path=/external-error" in caplog.text
-    assert f"provider_status={error.provider_status}" in caplog.text
-    assert "private-search-term" not in caplog.text
-    assert "Authorization" not in caplog.text
+    log_warning.assert_called_once_with(
+        "External movie provider failure: code=%s method=%s path=%s "
+        "provider_status=%s",
+        error.code,
+        "GET",
+        "/external-error",
+        error.provider_status,
+    )
 
 
 async def test_movie_not_found_response_remains_unchanged():

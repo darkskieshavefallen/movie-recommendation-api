@@ -82,6 +82,8 @@ ANT-21: добавлен `TmdbMovieClient` с одним переиспольз�
 
 ANT-22: внешний клиент переводит timeout, connection failure, provider status и malformed payload в application-owned исключения без сохранения provider body, полного URL или текста HTTPX-ошибки. `401/403` и прочие `4xx`/invalid response получают `502`, `429` и unavailable — `503`, timeout/`504` — `504`; безопасный целочисленный `Retry-After` может быть передан клиенту. Общий FastAPI handler возвращает `{"detail": "<safe message>"}` и логирует только category code, method, path и provider status без query/credential. Тесты на `MockTransport` покрывают все mappings, invalid JSON/data, сетевые ошибки и заголовок; отдельные API-тесты подтверждают публичные ответы, безопасные логи и неизменный CRUD `404`.
 
+ANT-23: добавлен read-only `GET /external/movies/search?query=...` по цепочке API → `ExternalMovieService` → `TmdbMovieClient`; зависимость PostgreSQL в этот flow не входит. Pydantic query-model обрезает строку и отклоняет missing/blank/>200 значений с `422` до provider call. Один HTTPX-клиент создаётся в FastAPI lifespan, доступен через app state и закрывается на shutdown. OpenAPI описывает query, provider-independent `200`, автоматический `422` и domain-mapped `502/503/504`. Endpoint-тесты заменяют integration dependency на `AsyncMock`, не используют сеть и покрывают normal/empty/error/validation responses, OpenAPI и lifecycle.
+
 ## Организация Docker-спринта (завершён, история)
 
 Одна ветка `feature/docker-sprint` от `main` и один PR на весь текущий спринт подготовки и Docker. По решению пользователя на каждую задачу ANT-5–ANT-11 создаётся отдельный коммит. После реализации задачи в Linear добавляется комментарий по-русски с результатами проверок и ссылкой на коммит.

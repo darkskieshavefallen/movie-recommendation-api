@@ -1,11 +1,25 @@
 from typing import Annotated
 
-from fastapi import Depends
+from fastapi import Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.integrations.tmdb import TmdbMovieClient
 from app.repositories.movie import MovieRepository
+from app.services.external_movie import ExternalMovieService
 from app.services.movie import MovieService
+
+
+def get_tmdb_movie_client(request: Request) -> TmdbMovieClient:
+    """Return the application-scoped external movie client."""
+    return request.app.state.tmdb_movie_client
+
+
+def get_external_movie_service(
+    client: Annotated[TmdbMovieClient, Depends(get_tmdb_movie_client)],
+) -> ExternalMovieService:
+    """Provide the service for read-only external catalog searches."""
+    return ExternalMovieService(client=client)
 
 
 def get_movie_repository(

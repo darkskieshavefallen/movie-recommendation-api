@@ -2,7 +2,7 @@
 
 from typing import Annotated
 
-from pydantic import BaseModel, ConfigDict, StrictInt, StringConstraints
+from pydantic import BaseModel, ConfigDict, Field, StrictInt, StringConstraints
 
 SearchQuery = Annotated[
     str,
@@ -17,7 +17,10 @@ RequiredText = Annotated[
 class ExternalMovieSearchQuery(BaseModel):
     """Validated input for an external movie search."""
 
-    query: SearchQuery
+    query: Annotated[
+        SearchQuery,
+        Field(description="Movie title to search for in the external catalog."),
+    ]
 
     model_config = ConfigDict(extra="forbid")
 
@@ -38,5 +41,13 @@ class ExternalMovieSearchResponse(BaseModel):
 
     query: SearchQuery
     results: list[ExternalMovieSearchResult]
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class ExternalMovieErrorResponse(BaseModel):
+    """Public error body for an external movie provider failure."""
+
+    detail: str
 
     model_config = ConfigDict(extra="forbid")
