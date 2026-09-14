@@ -24,6 +24,10 @@ jobs:
       # Unit tests mock database access; Compose provides its own database URL.
       DATABASE_URL: postgresql+asyncpg://ci:ci@127.0.0.1:5432/movie_ci
       LOG_LEVEL: INFO
+      # Settings validation requires explicit fake integration values; CI never calls TMDB.
+      TMDB_BASE_URL: https://tmdb.invalid/3
+      TMDB_READ_ACCESS_TOKEN: ci-fake-tmdb-read-access-token
+      TMDB_TIMEOUT_SECONDS: "5"
       COMPOSE_FILE: .github/compose.ci.yml
       COMPOSE_PROJECT_NAME: movie-ci-${{ github.run_id }}-${{ github.run_attempt }}
     steps:

@@ -7,6 +7,9 @@ services:
       APP_VERSION: ci
       LOG_LEVEL: INFO
       DATABASE_URL: postgresql+asyncpg://ci:ci@db:5432/movie_ci
+      TMDB_BASE_URL: https://tmdb.invalid/3
+      TMDB_READ_ACCESS_TOKEN: ci-fake-tmdb-read-access-token
+      TMDB_TIMEOUT_SECONDS: "5"
     depends_on:
       db:
         condition: service_healthy

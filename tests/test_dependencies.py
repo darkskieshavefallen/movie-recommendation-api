@@ -14,6 +14,11 @@ async def test_request_shares_session_and_cleans_up(monkeypatch):
     monkeypatch.setenv(
         "DATABASE_URL", "postgresql+asyncpg://test:test@localhost/test"
     )
+    monkeypatch.setenv("TMDB_BASE_URL", "https://tmdb.invalid/3")
+    monkeypatch.setenv(
+        "TMDB_READ_ACCESS_TOKEN", "test-fake-tmdb-read-access-token"
+    )
+    monkeypatch.setenv("TMDB_TIMEOUT_SECONDS", "5")
     from app.api.dependencies import get_movie_service
     from app.api.health import router
     from app.core.database import get_db

@@ -106,11 +106,13 @@ alembic/
 
 ## Run with Docker Compose
 
-Prerequisites: Git and Docker Desktop running (macOS/Windows), or Docker Engine with the Compose plugin (Linux). Port 8000 must be free. The first build needs Internet access to download images and Python dependencies. Local Python, a virtual environment, and a local PostgreSQL server are not required.
+Prerequisites: Git, a TMDB API Read Access Token, and Docker Desktop running (macOS/Windows), or Docker Engine with the Compose plugin (Linux). Port 8000 must be free. The first build needs Internet access to download images and Python dependencies. Local Python, a virtual environment, and a local PostgreSQL server are not required.
 
 ```bash
 git clone https://github.com/darkskieshavefallen/movie-recommendation-api.git
 cd movie-recommendation-api
+cp .env.example .env
+# Replace TMDB_READ_ACCESS_TOKEN in .env with your own token.
 docker compose up --build
 ```
 
@@ -118,7 +120,7 @@ Run all Compose commands from the repository root.
 
 Compose starts PostgreSQL, waits for its healthcheck, applies Alembic migrations, and then starts Uvicorn. A migration failure stops API startup. Open [Swagger UI](http://localhost:8000/docs).
 
-No `.env` file is required for Docker. Compose provides defaults for `APP_TITLE`, `APP_VERSION`, and `LOG_LEVEL`; if present, `.env` can override those values. The container receives its own `DATABASE_URL` with host `db`. Keep the local URL pointing to `localhost`; no switching is needed. `.env` is excluded from the build context.
+Docker Compose requires `TMDB_READ_ACCESS_TOKEN` from the shell environment or the local `.env` file; the value is passed to the container at runtime and is not stored in the image or Compose file. Compose provides safe defaults for `TMDB_BASE_URL`, `TMDB_TIMEOUT_SECONDS`, `APP_TITLE`, `APP_VERSION`, and `LOG_LEVEL`. The container receives its own `DATABASE_URL` with host `db`. Keep the local URL pointing to `localhost`; no switching is needed. `.env` is excluded from the build context.
 
 This is a development setup: the Docker database uses the explicit `movie_app` / `movie_app_dev` credentials from Compose. It is separate from any PostgreSQL database installed on your computer. PostgreSQL has no published host port; API is available only on `127.0.0.1:8000`.
 
@@ -208,6 +210,8 @@ postgresql+asyncpg://movie_app:<your-password>@localhost:5432/movie_recommendati
 
 URL-encode special characters in the password. Keep `.env` local. Settings load it relative to the working directory; migrations create tables, but do not create the PostgreSQL role or database.
 
+Request a TMDB API Read Access Token from your TMDB account settings and replace the safe `TMDB_READ_ACCESS_TOKEN` placeholder. `TMDB_BASE_URL` must be an HTTPS URL without embedded credentials, query, or fragment. `TMDB_TIMEOUT_SECONDS` must be a finite positive number. Missing or invalid required values stop application startup with a Pydantic validation error that names the affected setting.
+
 ### 6. Apply database migrations
 
 ```bash
@@ -233,6 +237,49 @@ python -m uvicorn app.main:app --reload
 | POST | `/movies/` | Create a movie |
 | PUT | `/movies/{id}` | Update a movie |
 | DELETE | `/movies/{id}` | Delete a movie |
+| GET | `/external/movies/search?query={title}` | Search the external movie catalog without changing local records |
+
+### External movie search
+
+Sprint 17 adds a provider-independent, read-only search endpoint backed by TMDB API v3. Obtain an API Read Access Token from the TMDB account settings, copy `.env.example` to `.env`, and replace only the `TMDB_READ_ACCESS_TOKEN` placeholder. The API Key is not used: the client sends the read token in the `Authorization: Bearer` header and never places it in a URL.
+
+| Setting | Required | Local value |
+| --- | --- | --- |
+| `TMDB_BASE_URL` | Yes | Keep `https://api.themoviedb.org/3` unless the provider endpoint changes |
+| `TMDB_READ_ACCESS_TOKEN` | Yes | Your secret API Read Access Token; never commit or log it |
+| `TMDB_TIMEOUT_SECONDS` | Yes | A finite positive timeout in seconds; the example uses `5` |
+
+With the application running, search from Swagger UI or the command line:
+
+```bash
+curl --get \
+  --data-urlencode "query=Alien" \
+  http://localhost:8000/external/movies/search
+```
+
+The response is owned by this application rather than TMDB and has the same envelope for zero, one, or many matches:
+
+```json
+{
+  "query": "Alien",
+  "results": [
+    {
+      "external_id": "348",
+      "title": "Alien",
+      "release_year": 1979,
+      "description": "..."
+    }
+  ]
+}
+```
+
+`external_id` identifies a provider record and is not a local PostgreSQL movie ID. Search does not create or update local movies. The query is trimmed and must contain 1–200 characters; invalid input returns `422` before contacting TMDB. Provider authentication or malformed-response failures return `502`, rate limits and outages return `503`, and timeouts return `504`. An empty provider result remains a successful `200` response with `"results": []`.
+
+Sprint 17 reads only the first TMDB search page, requests English (`en-US`) results with adult content excluded, and does not cache provider content. TMDB offers no availability SLA. Before exposing the endpoint outside local development, include an approved TMDB logo and this notice in a visible About or Credits surface:
+
+> This product uses TMDB and the TMDB APIs but is not endorsed, certified, or otherwise approved by TMDB.
+
+This project uses TMDB only for personal, non-commercial catalog search. Commercial use requires a separate agreement. Do not add an ML or AI component while TMDB remains connected unless TMDB grants written permission covering that combined use; otherwise replace the provider or remove and fully separate the integration. See the [provider decision and complete operating boundaries](docs/EXTERNAL_MOVIE_API.md).
 
 ---
 
@@ -285,7 +332,7 @@ docker compose run --rm --no-deps --entrypoint python api -m ruff check .
 
 On Windows, use `.venv\Scripts\python.exe`. If cache writes are restricted, add `-p no:cacheprovider` to pytest and `--no-cache` to Ruff.
 
-Verified on 2026-09-08: all 16 tests pass and Ruff checks pass. Update/delete explicitly roll back the lookup transaction before re-raising `MovieNotFoundError`; the API handler remains responsible for logging the 404. FastAPI dependencies use `Annotated`; a request-level test verifies the shared session and dependency cleanup. OpenAPI is unchanged after the dependency refactor. The unit tests do not require a live database. A separate Docker smoke check verified fresh startup, automatic migrations, health endpoints, Swagger, CRUD, and persistence after container recreation; see [verification results](docs/DOCKER_VERIFICATION.md).
+Verified on 2026-09-14: all 79 tests pass and Ruff checks pass. The suite covers local movie service behavior plus external settings, schemas, TMDB normalization and failure mappings, dependency wiring, application lifecycle, endpoint validation, successful search, and empty results. External tests use mock transports or dependency overrides and never contact TMDB; unit tests do not require a live database. A separate Docker smoke check verified fresh startup, automatic migrations, health endpoints, Swagger, CRUD, and persistence after container recreation; see [verification results](docs/DOCKER_VERIFICATION.md).
 
 The Docker sprint (ANT-5–ANT-11) was merged into `main` through [PR #8](https://github.com/darkskieshavefallen/movie-recommendation-api/pull/8).
 
@@ -302,7 +349,7 @@ The CI badge at the top of this README reports the latest `main` workflow. Pull 
 
 [GitHub Actions workflow](.github/workflows/ci.yml) runs on pull requests targeting `main` and pushes to `main`. Its `checks` job uses a fresh GitHub-hosted Ubuntu runner with Python 3.13. Steps check out the repository, install dependencies with `python -m pip install -e ".[dev]"`, and run Ruff followed by pytest using the commands above. A failed step fails the job; failures are not ignored.
 
-The job's `env` block provides explicit non-sensitive application settings, so CI needs no `.env` file or repository secrets. The database URL is a placeholder: existing tests mock database access and require no PostgreSQL service or migrations. These checks do not verify connectivity to a real database.
+The job's `env` block provides explicit non-sensitive application settings, including a fake TMDB URL and token, so CI needs no `.env` file or repository secrets and never contacts the real provider. The database URL is also a placeholder: existing unit tests mock database access and require no PostgreSQL service or migrations.
 
 After Ruff and pytest pass, the same job builds the repository's Dockerfile with `docker build --tag "$CI_IMAGE" .`; the root `.dockerignore` filters the build context. `CI_IMAGE` is set to `movie-recommendation-api:<full-commit-sha>` using `git rev-parse HEAD` and passed to subsequent steps through `GITHUB_ENV`. For a pull request, the checked-out commit is normally GitHub's temporary merge commit, so the tag identifies the code actually tested.
 
@@ -333,7 +380,7 @@ bash .github/scripts/verify-published-image.sh \
   ghcr.io/darkskieshavefallen/movie-recommendation-api@sha256:<registry-digest>
 ```
 
-The script must run from a machine with Docker and Internet access. Public GHCR packages can be pulled anonymously. For a private package, first authenticate with a GitHub personal access token (classic) that has `read:packages`; use your GitHub username and supply the token through stdin so it is not written in the command:
+The script must run from a machine with Docker and Internet access, and `TMDB_READ_ACCESS_TOKEN` must be available in its shell environment. Public GHCR packages can be pulled anonymously. For a private package, first authenticate with a GitHub personal access token (classic) that has `read:packages`; use your GitHub username and supply the token through stdin so it is not written in the command:
 
 ```bash
 printf '%s' "$CR_PAT" | docker login ghcr.io \
@@ -350,6 +397,12 @@ ghcr.io/darkskieshavefallen/movie-recommendation-api@sha256:aca66f496b9eeead4fed
 ```
 
 The helper pulled the immutable digest without a local build, started PostgreSQL and the API, confirmed Alembic revision `474e3311e20a`, received HTTP 200 from `/health` and `/health/db`, and removed its containers, network, and disposable volume.
+
+### External movie catalog (ANT-18–ANT-24)
+
+Sprint 17 implements provider-independent, read-only movie search. ANT-18 selects TMDB API v3 and defines the smallest application contract, field mapping, error behavior, attribution requirements, and usage boundaries in [the external catalog decision](docs/EXTERNAL_MOVIE_API.md). ANT-19 adds validated provider settings and runtime-only token injection. ANT-20 defines the application schemas. ANT-21 adds the managed asynchronous TMDB client and normalization. ANT-22 maps provider failures to safe domain errors and HTTP responses. ANT-23 exposes `GET /external/movies/search` through the service and app-scoped client.
+
+ANT-24 completes local verification and documentation. On 2026-09-14, Docker Compose started the API with PostgreSQL and locally supplied integration settings; `/health`, `/health/db`, Swagger, and OpenAPI succeeded. One bounded request for `Alien` returned `200` with normalized results through both `curl` and Swagger. The credential and raw provider payload were not written to the repository or verification report. Automated tests remain deterministic: they replace external transport or dependencies and never contact TMDB.
 
 See [project context](docs/PROJECT_CONTEXT.md) for the agreed sequence and Docker decisions, and [AGENTS.md](AGENTS.md) for contributor instructions.
 
@@ -379,7 +432,7 @@ See [project context](docs/PROJECT_CONTEXT.md) for the agreed sequence and Docke
 - [x] CI checks, Docker build, and PostgreSQL smoke pipeline
 - [x] GHCR publication and pull verification
 - [ ] Server deployment
-- [ ] External movie API integration
+- [x] External movie API integration
 - [ ] Recommendation engine
 - [ ] React frontend
 

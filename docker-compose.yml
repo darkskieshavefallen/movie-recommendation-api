@@ -7,6 +7,9 @@ services:
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       # Docker-only development credentials; local DATABASE_URL is unchanged.
       DATABASE_URL: postgresql+asyncpg://movie_app:movie_app_dev@db:5432/movie_recommendation
+      TMDB_BASE_URL: ${TMDB_BASE_URL:-https://api.themoviedb.org/3}
+      TMDB_READ_ACCESS_TOKEN: ${TMDB_READ_ACCESS_TOKEN:?Set TMDB_READ_ACCESS_TOKEN in the local environment or .env}
+      TMDB_TIMEOUT_SECONDS: ${TMDB_TIMEOUT_SECONDS:-5}
     ports:
       - "127.0.0.1:8000:8000"
     depends_on:

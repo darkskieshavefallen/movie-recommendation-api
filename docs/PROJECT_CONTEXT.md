@@ -1,20 +1,20 @@
 # Контекст проекта и текущий спринт
 
-Обновлено: 2026-09-10. Факты ниже — снимок состояния, перед изменениями перепроверь их.
+Обновлено: 2026-09-14. Факты ниже — снимок состояния, перед изменениями перепроверь их.
 
 ## Цель и состояние
 
-Учебный backend рекомендаций фильмов. Сейчас реализован CRUD фильмов; интеграция с внешним кино-API и сам recommendation engine относятся к будущей работе.
+Учебный backend рекомендаций фильмов. Реализованы CRUD локальных фильмов и независимый read-only поиск во внешнем каталоге TMDB; recommendation engine ещё не реализован и заблокирован условиями использования TMDB, пока не будет получено письменное разрешение, заменён провайдер либо полностью удалена и отделена TMDB-интеграция.
 
 Стек: Python 3.13, FastAPI, Pydantic v2, SQLAlchemy async, asyncpg, PostgreSQL, Alembic, pytest, Ruff. Есть DI, сервисы/репозитории, обработчики ошибок и централизованное логирование.
 
-Текущая точка: PR #8 (ANT-5–ANT-11) влит 8 сентября. Sprint 16 — CI and Docker image publishing — завершён и влит через PR #9: https://github.com/darkskieshavefallen/movie-recommendation-api/pull/9. Merge-коммит `64746bbb1ea442e0ea7dff14581ab173c6a87d00`; задачи ANT-12–ANT-17 выполнены. Следующий отдельный этап — развёртывание опубликованного образа на сервере.
+Текущая точка: Docker-спринт влит через PR #8, Sprint 16 — через PR #9, а итоговая документация — через PR #10. Задачи ANT-5–ANT-17 выполнены. Sprint 17 — External movie catalog integration — реализован в общей ветке `feature/external-catalog-sprint` и draft PR #11; ANT-18–ANT-23 опубликованы отдельными коммитами, ANT-24 завершает проверку и документацию перед ревью.
 
 ANT-12: опубликован коммит `13352d5`, добавлен `.github/workflows/ci.yml` для PR в main и push в main: Ubuntu, Python 3.13, установка `.[dev]`, Ruff и pytest. Настройки заданы явно в env без секретов; PostgreSQL не запускается, доступ к БД подменён в существующих тестах. Локально, в копии без `.env` и на чистом GitHub runner проверки прошли: 16 тестов, Ruff. Удалённый запуск: https://github.com/darkskieshavefallen/movie-recommendation-api/actions/runs/34412395887. Ссылки на коммит, ветку и PR прикреплены к Linear; задача закрыта.
 
 ANT-13: после тестов в тот же job добавлены определение `CI_IMAGE=movie-recommendation-api:<git rev-parse HEAD>`, `docker build --tag "$CI_IMAGE" .` и проверка доступности образа через `docker image inspect`. Тег передаётся следующим шагам через `GITHUB_ENV`. Сборка использует существующие Dockerfile и .dockerignore; образ доступен следующему шагу в локальном Docker runner без пересборки. Для PR тег соответствует фактически проверяемому merge-коммиту GitHub. Ошибки сборки/inspect не игнорируются. README описывает этот контракт. Проверены синтаксис YAML (Psych), shell-команд (`bash -n`) и `git diff --check`; результат удалённой сборки после отправки коммита фиксируется в PR #9 и Linear. Запуск с PostgreSQL — ANT-14, публикация образа — последующие задачи, пока не реализованы.
 
-Docker Desktop установлен и запущен при проверке ANT-7. В терминале агента команда доступна как `/Users/anton/.docker/bin/docker`; для сборки потребовалось добавить `/Applications/Docker.app/Contents/Resources/bin` в PATH команды. До появления .dockerignore использован временный tar-контекст только из Dockerfile и выбранных отслеживаемых файлов, без .env, .venv и IDE-артефактов. Запуск API с БД в контейнере ещё не проверялся. В ANT-7 прикреплены коммит, ветка и PR, оставлен русский отчёт; задача не закрывалась.
+Docker Desktop установлен. В терминале агента команда доступна как `/Users/anton/.docker/bin/docker`; для сборки может потребоваться добавить `/Applications/Docker.app/Contents/Resources/bin` в `PATH`. Compose-запуск API с PostgreSQL, миграциями и обоими health-маршрутами проверен в ANT-10, ANT-11 и повторно с реальной TMDB-конфигурацией в ANT-24. `.env`, `.venv` и IDE-артефакты исключены из build context.
 
 ## Выявленные вопросы
 
@@ -65,6 +65,26 @@ Docker Desktop установлен и запущен при проверке AN
 ## Организация CI-спринта
 
 Спринт завершён в общей ветке `feature/ci-sprint` и влит через PR #9. Каждая задача ANT-12–ANT-17 была опубликована отдельным коммитом с ANT-идентификатором; ссылки на коммиты, ветку и общий PR прикреплены к Linear. После merge успешно проверены полный `main` pipeline, публикация в GHCR и запуск точного digest.
+
+## Организация Sprint 17
+
+Общая ветка — `feature/external-catalog-sprint`, общий draft PR создаётся с первой задачей. Для ANT-18–ANT-24 сохраняется отдельный коммит на задачу с ANT-идентификатором; после публикации ссылки на коммит, ветку, PR и CI прикрепляются к Linear.
+
+ANT-18: по официальной документации на 12 сентября сравнены TMDB API v3 и OMDb. Для read-only поиска выбран TMDB: Bearer token не попадает в URL, search payload уже содержит минимальные поля приложения, а HTTP/status-коды и rate limiting документированы лучше. Единственная нужная операция — `GET /3/search/movie`; details lookup не требуется. Провайдерские `id`, `title`, `release_date`, `overview` нормализуются в `external_id`, `title`, `release_year`, `description`. Пустой результат остаётся успешным; validation/auth/rate-limit/timeout/outage/malformed-response получают заранее определённое поведение. Решение и источники — `docs/EXTERNAL_MOVIE_API.md`.
+
+Граница лицензии: TMDB разрешает бесплатное некоммерческое использование с обязательной атрибуцией, но текущие API Terms запрещают использовать TMDB API или content вообще «in connection with» ML/AI-приложением. Решение ANT-18 относится только к приложению с каталожным поиском без ML/AI-компонента. До добавления любого ML/AI-компонента нужно получить письменное разрешение TMDB на совместное использование, заменить провайдера либо удалить и полностью отделить TMDB-интеграцию от ML/AI-приложения. Простого запрета передавать TMDB-данные в модель недостаточно. Production-код, настройки и секреты в ANT-18 не добавляются.
+
+ANT-19: `Settings` дополнен обязательными `TMDB_BASE_URL`, `TMDB_READ_ACCESS_TOKEN`, `TMDB_TIMEOUT_SECONDS`. URL типизирован и допускает только HTTPS без credentials/query/fragment, token хранится в `SecretStr` и не может быть пустым, timeout — конечное положительное число. `.env.example` содержит безопасный placeholder. Development и GHCR Compose требуют token из локального окружения или `.env` и не содержат credential; значения передаются контейнеру только runtime. Workflow и CI Compose используют явные fake URL/token и не обращаются к провайдеру. Тесты проверяют валидную конфигурацию, redaction token, отсутствующее обязательное поле и некорректные значения; существующий dependency test получил явные fake-настройки.
+
+ANT-20: добавлены provider-independent Pydantic-схемы внешнего поиска. Поисковая строка обрезается и должна содержать 1–200 символов. Результат требует непустые `external_id` и `title`, безопасно допускает отсутствие `release_year` и `description`, а единый envelope всегда содержит нормализованный `query` и список `results`. Лишние поля запрещены, поэтому TMDB-specific payload не может случайно стать частью публичного контракта. Схемы не используют repository или PostgreSQL; тесты покрывают валидные данные, пустые optional-поля, неверные required/optional-поля и ноль, один или несколько результатов.
+
+ANT-21: добавлен `TmdbMovieClient` с одним переиспользуемым `httpx.AsyncClient` и async context manager для гарантированного закрытия соединений. Клиент использует base URL, Bearer token и timeout из валидированных настроек, отправляет только согласованные query-параметры и переводит первый TMDB result page в application-owned схемы. Внутренние TMDB payload-модели остаются в `app/integrations/`, игнорируют ненужные поля провайдера и отклоняют неверные обязательные значения; пустой список остаётся успешным ответом. Тесты используют только `httpx.MockTransport`, проверяют запрос, нормализацию, пустой ответ, malformed payload, отсутствие credential/URL в логах и закрытие клиента. Перевод HTTPX/Pydantic ошибок в доменные исключения остаётся задачей ANT-22.
+
+ANT-22: внешний клиент переводит timeout, connection failure, provider status и malformed payload в application-owned исключения без сохранения provider body, полного URL или текста HTTPX-ошибки. `401/403` и прочие `4xx`/invalid response получают `502`, `429` и unavailable — `503`, timeout/`504` — `504`; безопасный целочисленный `Retry-After` может быть передан клиенту. Общий FastAPI handler возвращает `{"detail": "<safe message>"}` и логирует только category code, method, path и provider status без query/credential. Тесты на `MockTransport` покрывают все mappings, invalid JSON/data, сетевые ошибки и заголовок; отдельные API-тесты подтверждают публичные ответы, безопасные логи и неизменный CRUD `404`.
+
+ANT-23: добавлен read-only `GET /external/movies/search?query=...` по цепочке API → `ExternalMovieService` → `TmdbMovieClient`; зависимость PostgreSQL в этот flow не входит. Pydantic query-model обрезает строку и отклоняет missing/blank/>200 значений с `422` до provider call. Один HTTPX-клиент создаётся в FastAPI lifespan, доступен через app state и закрывается на shutdown. OpenAPI описывает query, provider-independent `200`, автоматический `422` и domain-mapped `502/503/504`. Endpoint-тесты заменяют integration dependency на `AsyncMock`, не используют сеть и покрывают normal/empty/error/validation responses, OpenAPI и lifecycle.
+
+ANT-24: полный локальный поток подтверждён 14 сентября 2026 года. Development Compose собрал и запустил API с PostgreSQL и локально переданным API Read Access Token; миграции применились, контейнеры стали healthy, `/health` и `/health/db` вернули `200`, Swagger и OpenAPI содержали внешний маршрут. Один ограниченный реальный поиск `Alien` через HTTP и Swagger вернул `200` и 20 нормализованных результатов; токен и сырой provider payload не добавлялись в репозиторий или отчёт проверки. Автотесты остаются детерминированными и не обращаются к TMDB. README дополнен настройкой провайдера, переменными окружения, примером endpoint, ошибками, ограничениями, атрибуцией и ML/AI gate.
 
 ## Организация Docker-спринта (завершён, история)
 
