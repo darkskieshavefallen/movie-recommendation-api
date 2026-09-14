@@ -8,7 +8,7 @@
 
 Стек: Python 3.13, FastAPI, Pydantic v2, SQLAlchemy async, asyncpg, PostgreSQL, Alembic, pytest, Ruff. Есть DI, сервисы/репозитории, обработчики ошибок и централизованное логирование.
 
-Текущая точка: Docker-спринт влит через PR #8, Sprint 16 — через PR #9, а итоговая документация — через PR #10. Задачи ANT-5–ANT-17 выполнены. Sprint 17 — External movie catalog integration — реализован в общей ветке `feature/external-catalog-sprint` и draft PR #11; ANT-18–ANT-23 опубликованы отдельными коммитами, ANT-24 завершает проверку и документацию перед ревью.
+Текущая точка: Docker-спринт влит через PR #8, Sprint 16 — через PR #9, а итоговая документация — через PR #10. Sprint 17 реализован задачами ANT-18–ANT-24 и влит через PR #11; main CI после merge прошёл. Начат Sprint 18 — Local catalog and first recommendations в общей ветке `feature/local-recommendations-sprint` и draft PR #12 на `main`.
 
 ANT-12: опубликован коммит `13352d5`, добавлен `.github/workflows/ci.yml` для PR в main и push в main: Ubuntu, Python 3.13, установка `.[dev]`, Ruff и pytest. Настройки заданы явно в env без секретов; PostgreSQL не запускается, доступ к БД подменён в существующих тестах. Локально, в копии без `.env` и на чистом GitHub runner проверки прошли: 16 тестов, Ruff. Удалённый запуск: https://github.com/darkskieshavefallen/movie-recommendation-api/actions/runs/34412395887. Ссылки на коммит, ветку и PR прикреплены к Linear; задача закрыта.
 
@@ -85,6 +85,14 @@ ANT-22: внешний клиент переводит timeout, connection failu
 ANT-23: добавлен read-only `GET /external/movies/search?query=...` по цепочке API → `ExternalMovieService` → `TmdbMovieClient`; зависимость PostgreSQL в этот flow не входит. Pydantic query-model обрезает строку и отклоняет missing/blank/>200 значений с `422` до provider call. Один HTTPX-клиент создаётся в FastAPI lifespan, доступен через app state и закрывается на shutdown. OpenAPI описывает query, provider-independent `200`, автоматический `422` и domain-mapped `502/503/504`. Endpoint-тесты заменяют integration dependency на `AsyncMock`, не используют сеть и покрывают normal/empty/error/validation responses, OpenAPI и lifecycle.
 
 ANT-24: полный локальный поток подтверждён 14 сентября 2026 года. Development Compose собрал и запустил API с PostgreSQL и локально переданным API Read Access Token; миграции применились, контейнеры стали healthy, `/health` и `/health/db` вернули `200`, Swagger и OpenAPI содержали внешний маршрут. Один ограниченный реальный поиск `Alien` через HTTP и Swagger вернул `200` и 20 нормализованных результатов; токен и сырой provider payload не добавлялись в репозиторий или отчёт проверки. Автотесты остаются детерминированными и не обращаются к TMDB. README дополнен настройкой провайдера, переменными окружения, примером endpoint, ошибками, ограничениями, атрибуцией и ML/AI gate.
+
+## Организация Sprint 18
+
+Общая ветка — `feature/local-recommendations-sprint`, общий draft PR #12 создан с ANT-25 на базе `main`. Для ANT-25–ANT-30 сохраняется отдельный коммит на задачу с ANT-идентификатором.
+
+Sprint 18 использует только фильмы из локальной PostgreSQL и вручную составленные жанры. В нём нет импорта или сохранения TMDB results, обращений к TMDB из recommendation flow и ML/AI-компонента. Это сохраняет границу, установленную в `docs/EXTERNAL_MOVIE_API.md`.
+
+ANT-25: контракт в `docs/LOCAL_RECOMMENDATIONS.md` задаёт будущий `GET /movies/{movie_id}/recommendations?limit=5`, диапазон limit 1–20 и стабильный response envelope. Кандидаты сортируются по числу общих нормализованных жанров, затем по близости года и локальному ID; исходный фильм и фильмы без общих жанров исключаются. Для неизвестного ID сохраняется текущий `404`, отсутствие жанров или совпадений даёт `200` с пустым списком, неверный limit — `422`. Жанры представлены отсортированным списком строк в нижнем регистре; пробелы нормализуются, blank/duplicate/>10/>50 символов отклоняются. Документ содержит рабочий пример и явно фиксирует rule-based, local-only границу без TMDB и ML/AI.
 
 ## Организация Docker-спринта (завершён, история)
 
