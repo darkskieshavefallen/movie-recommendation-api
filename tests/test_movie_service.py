@@ -43,6 +43,7 @@ async def test_create_movie_success(movie_service, mock_repository, mock_session
         title="The Matrix",
         release_year=1999,
         description="A hacker discovers reality is a simulation",
+        genres=[" Science   Fiction ", "Drama"],
     )
 
     orm_movie = Movie(
@@ -50,6 +51,7 @@ async def test_create_movie_success(movie_service, mock_repository, mock_session
         title="The Matrix",
         release_year=1999,
         description="A hacker discovers reality is a simulation",
+        genres=["drama", "science fiction"],
     )
 
     mock_repository.add = AsyncMock(return_value=orm_movie)
@@ -62,11 +64,13 @@ async def test_create_movie_success(movie_service, mock_repository, mock_session
     assert result.title == "The Matrix"
     assert result.release_year == 1999
     assert result.description == "A hacker discovers reality is a simulation"
+    assert result.genres == ["drama", "science fiction"]
 
     mock_repository.add.assert_awaited_once_with(
         title="The Matrix",
         release_year=1999,
         description="A hacker discovers reality is a simulation",
+        genres=["drama", "science fiction"],
     )
     mock_session.commit.assert_awaited_once()
     mock_session.refresh.assert_awaited_once_with(orm_movie)
@@ -82,6 +86,7 @@ async def test_create_movie_rollback_on_error(
         title="The Matrix",
         release_year=1999,
         description="A hacker discovers reality is a simulation",
+        genres=[],
     )
 
     mock_repository.add = AsyncMock(side_effect=Exception("Database error"))
@@ -107,6 +112,7 @@ async def test_get_movie_found(movie_service, mock_repository, mock_session):
         title="The Matrix",
         release_year=1999,
         description="A hacker discovers reality is a simulation",
+        genres=[],
     )
 
     mock_repository.get_by_id = AsyncMock(return_value=orm_movie)
@@ -150,8 +156,20 @@ async def test_list_movies_success(movie_service, mock_repository, mock_session)
     """Test listing movies with default pagination."""
     # Arrange
     orm_movies = [
-        Movie(id=1, title="The Matrix", release_year=1999, description="Sci-fi"),
-        Movie(id=2, title="Inception", release_year=2010, description="Dream heist"),
+        Movie(
+            id=1,
+            title="The Matrix",
+            release_year=1999,
+            description="Sci-fi",
+            genres=["science fiction"],
+        ),
+        Movie(
+            id=2,
+            title="Inception",
+            release_year=2010,
+            description="Dream heist",
+            genres=[],
+        ),
     ]
 
     mock_repository.get_all = AsyncMock(return_value=orm_movies)
@@ -176,7 +194,13 @@ async def test_list_movies_with_pagination(movie_service, mock_repository, mock_
     """Test listing movies with custom pagination."""
     # Arrange
     orm_movies = [
-        Movie(id=3, title="Interstellar", release_year=2014, description="Space"),
+        Movie(
+            id=3,
+            title="Interstellar",
+            release_year=2014,
+            description="Space",
+            genres=["drama", "science fiction"],
+        ),
     ]
 
     mock_repository.get_all = AsyncMock(return_value=orm_movies)
@@ -222,6 +246,7 @@ async def test_update_movie_success(movie_service, mock_repository, mock_session
         title="The Matrix Reloaded",
         release_year=2003,
         description="Updated description",
+        genres=["Science Fiction", " Action "],
     )
 
     orm_movie = Movie(
@@ -229,6 +254,7 @@ async def test_update_movie_success(movie_service, mock_repository, mock_session
         title="The Matrix Reloaded",
         release_year=2003,
         description="Updated description",
+        genres=["action", "science fiction"],
     )
 
     mock_repository.update = AsyncMock(return_value=orm_movie)
@@ -239,12 +265,14 @@ async def test_update_movie_success(movie_service, mock_repository, mock_session
     # Assert
     assert isinstance(result, MovieRead)
     assert result.title == "The Matrix Reloaded"
+    assert result.genres == ["action", "science fiction"]
 
     mock_repository.update.assert_awaited_once_with(
         movie_id=1,
         title="The Matrix Reloaded",
         release_year=2003,
         description="Updated description",
+        genres=["action", "science fiction"],
     )
     mock_session.commit.assert_awaited_once()
     mock_session.refresh.assert_awaited_once_with(orm_movie)

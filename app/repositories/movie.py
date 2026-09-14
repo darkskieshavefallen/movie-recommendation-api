@@ -16,6 +16,7 @@ class MovieRepository:
         title: str,
         release_year: int,
         description: str | None = None,
+        genres: list[str] | None = None,
     ) -> Movie:
         """
         Create a new movie.
@@ -27,6 +28,7 @@ class MovieRepository:
             title=title,
             release_year=release_year,
             description=description,
+            genres=genres if genres is not None else [],
         )
 
         self.session.add(movie)
@@ -53,6 +55,7 @@ class MovieRepository:
         title: str,
         release_year: int,
         description: str | None = None,
+        genres: list[str] | None = None,
     ) -> Movie | None:
         """
         Update an existing movie.
@@ -65,6 +68,7 @@ class MovieRepository:
             title: New title.
             release_year: New release year.
             description: New description.
+            genres: New normalized genres.
 
         Returns:
             Updated Movie if found, otherwise None.
@@ -77,6 +81,7 @@ class MovieRepository:
         movie.title = title
         movie.release_year = release_year
         movie.description = description
+        movie.genres = genres if genres is not None else []
 
         await self.session.flush()
 
