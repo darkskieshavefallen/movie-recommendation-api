@@ -1,4 +1,4 @@
-from sqlalchemy import select
+from sqlalchemy import select, tuple_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.movie import Movie
@@ -16,6 +16,7 @@ class MovieRepository:
         title: str,
         release_year: int,
         description: str | None = None,
+        genres: list[str] | None = None,
     ) -> Movie:
         """
         Create a new movie.
@@ -27,6 +28,7 @@ class MovieRepository:
             title=title,
             release_year=release_year,
             description=description,
+            genres=genres if genres is not None else [],
         )
 
         self.session.add(movie)
@@ -53,6 +55,7 @@ class MovieRepository:
         title: str,
         release_year: int,
         description: str | None = None,
+        genres: list[str] | None = None,
     ) -> Movie | None:
         """
         Update an existing movie.
@@ -65,6 +68,7 @@ class MovieRepository:
             title: New title.
             release_year: New release year.
             description: New description.
+            genres: New normalized genres.
 
         Returns:
             Updated Movie if found, otherwise None.
@@ -77,6 +81,7 @@ class MovieRepository:
         movie.title = title
         movie.release_year = release_year
         movie.description = description
+        movie.genres = genres if genres is not None else []
 
         await self.session.flush()
 
@@ -124,6 +129,33 @@ class MovieRepository:
             select(Movie)
             .offset(offset)
             .limit(limit)
+        )
+
+        return list(result.scalars().all())
+
+    async def get_existing_identities(
+        self,
+        identities: set[tuple[str, int]],
+    ) -> set[tuple[str, int]]:
+        """Return title/year identities already stored in the catalog."""
+        if not identities:
+            return set()
+
+        result = await self.session.execute(
+            select(Movie.title, Movie.release_year).where(
+                tuple_(Movie.title, Movie.release_year).in_(identities)
+            )
+        )
+
+        return {(row.title, row.release_year) for row in result}
+
+    async def get_recommendation_candidates(
+        self,
+        source_movie_id: int,
+    ) -> list[Movie]:
+        """Return local movies other than the recommendation source."""
+        result = await self.session.execute(
+            select(Movie).where(Movie.id != source_movie_id)
         )
 
         return list(result.scalars().all())

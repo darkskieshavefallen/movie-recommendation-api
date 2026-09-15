@@ -31,6 +31,7 @@ class MovieService:
                 title=movie.title,
                 release_year=movie.release_year,
                 description=movie.description,
+                genres=movie.genres,
             )
 
             await self._session.commit()
@@ -64,6 +65,7 @@ class MovieService:
                 title=movie.title,
                 release_year=movie.release_year,
                 description=movie.description,
+                genres=movie.genres,
             )
 
             if orm_movie is None:
