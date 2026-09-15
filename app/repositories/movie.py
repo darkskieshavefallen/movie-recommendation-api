@@ -1,4 +1,4 @@
-from sqlalchemy import select
+from sqlalchemy import select, tuple_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.movie import Movie
@@ -132,3 +132,19 @@ class MovieRepository:
         )
 
         return list(result.scalars().all())
+
+    async def get_existing_identities(
+        self,
+        identities: set[tuple[str, int]],
+    ) -> set[tuple[str, int]]:
+        """Return title/year identities already stored in the catalog."""
+        if not identities:
+            return set()
+
+        result = await self.session.execute(
+            select(Movie.title, Movie.release_year).where(
+                tuple_(Movie.title, Movie.release_year).in_(identities)
+            )
+        )
+
+        return {(row.title, row.release_year) for row in result}

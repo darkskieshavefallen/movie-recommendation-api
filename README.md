@@ -224,6 +224,30 @@ alembic upgrade head
 python -m uvicorn app.main:app --reload
 ```
 
+## Optional Local Demo Catalog
+
+After migrations are applied, explicitly seed 12 manually authored movies into the configured development database:
+
+```bash
+python -m app.cli.seed_demo
+```
+
+For the Docker Compose setup, run the same opt-in command inside the running API container:
+
+```bash
+docker compose exec api python -m app.cli.seed_demo
+```
+
+The seed never runs during application startup, migrations, CI, or production image startup. It accepts only a PostgreSQL URL using `localhost`, a loopback address, or the Compose host `db`, and a database name that is `movie_recommendation` or ends in `_dev`, `_test`, `_demo`, or `_ci`. The command prints only the database name and host, without credentials.
+
+Each bundled record has an application-authored title, release year, and local genres. The dataset contains no TMDB identifiers, responses, or copied descriptions. Re-running the command skips existing `(title, release_year)` pairs and leaves their genres and descriptions unchanged.
+
+With the API running, inspect the catalog through the existing endpoint:
+
+```bash
+curl --fail "http://localhost:8000/movies/?limit=20"
+```
+
 ---
 
 ## Available Endpoints
@@ -332,7 +356,7 @@ docker compose run --rm --no-deps --entrypoint python api -m ruff check .
 
 On Windows, use `.venv\Scripts\python.exe`. If cache writes are restricted, add `-p no:cacheprovider` to pytest and `--no-cache` to Ruff.
 
-Verified on 2026-09-14: all 79 tests pass and Ruff checks pass. The suite covers local movie service behavior plus external settings, schemas, TMDB normalization and failure mappings, dependency wiring, application lifecycle, endpoint validation, successful search, and empty results. External tests use mock transports or dependency overrides and never contact TMDB; unit tests do not require a live database. A separate Docker smoke check verified fresh startup, automatic migrations, health endpoints, Swagger, CRUD, and persistence after container recreation; see [verification results](docs/DOCKER_VERIFICATION.md).
+Verified on 2026-09-16: all 103 tests pass and Ruff checks pass. The suite covers local movie CRUD and genres, demo-catalog idempotency and target safety, external settings, TMDB normalization and failure mappings, dependency wiring, application lifecycle, and endpoint validation. External tests use mock transports or dependency overrides and never contact TMDB; unit tests do not require a live database. Separate disposable-database checks verified migrations, the opt-in demo seed, API reads, and Docker startup; see [verification results](docs/DOCKER_VERIFICATION.md).
 
 The Docker sprint (ANT-5–ANT-11) was merged into `main` through [PR #8](https://github.com/darkskieshavefallen/movie-recommendation-api/pull/8).
 
