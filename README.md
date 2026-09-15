@@ -269,12 +269,29 @@ curl --fail "http://localhost:8000/movies/?limit=20"
 Seed the opt-in demo catalog as described above, then request recommendations for a local movie ID:
 
 ```bash
+curl --fail "http://localhost:8000/movies/?limit=20"
 curl --fail "http://localhost:8000/movies/1/recommendations?limit=5"
 ```
 
-The response contains the source ID and an ordered list of local movies. Each result includes `matching_genres` to explain the match. Ranking prefers more shared genres, then a closer release year, then the lower local ID. The optional `limit` defaults to `5` and accepts `1`–`20`; invalid input returns `422`, an unknown source returns `404`, and no matches returns `200` with an empty list.
+Use the list response to select the local source ID; `1` is the ID assigned to `Orbit of Glass` in a fresh empty database seeded with the current demo catalog. A recommendation response begins like this:
 
-This path reads only the local PostgreSQL catalog. It does not call TMDB, import external content, or use an ML/AI model. See the [local recommendation contract](docs/LOCAL_RECOMMENDATIONS.md) for the complete ranking and genre rules.
+```json
+{
+  "source_movie_id": 1,
+  "recommendations": [
+    {
+      "movie_id": 2,
+      "title": "The Quiet Signal",
+      "release_year": 2001,
+      "matching_genres": ["science fiction"]
+    }
+  ]
+}
+```
+
+The response contains the source ID and an ordered list of local movies. `matching_genres` explains why each movie qualified. Ranking prefers more shared genres, then a closer release year, then the lower local ID. The optional `limit` defaults to `5` and accepts `1`–`20`; invalid input returns `422`, an unknown source returns `404`, and no matches returns `200` with an empty list.
+
+This path reads only the local PostgreSQL catalog. It does not call TMDB, import external content, or use an ML/AI model. See the [local recommendation contract](docs/LOCAL_RECOMMENDATIONS.md) for the complete ranking and genre rules and the [ANT-30 verification](docs/LOCAL_RECOMMENDATIONS_VERIFICATION.md) for the repeatable empty-database flow and observed results.
 
 ### External movie search
 
@@ -441,9 +458,11 @@ Sprint 17 implements provider-independent, read-only movie search. ANT-18 select
 
 ANT-24 completes local verification and documentation. On 2026-09-14, Docker Compose started the API with PostgreSQL and locally supplied integration settings; `/health`, `/health/db`, Swagger, and OpenAPI succeeded. One bounded request for `Alien` returned `200` with normalized results through both `curl` and Swagger. The credential and raw provider payload were not written to the repository or verification report. Automated tests remain deterministic: they replace external transport or dependencies and never contact TMDB.
 
-### Local recommendations (ANT-25–ANT-29)
+### Local recommendations (ANT-25–ANT-30)
 
 Sprint 18 adds normalized local genres, an opt-in fictional demo catalog, deterministic ranking, and `GET /movies/{movie_id}/recommendations`. The endpoint validates `movie_id` and `limit`, returns the shared genres behind every match, preserves the existing movie `404`, and returns an empty successful response when no candidate qualifies. This flow is local-only and read-only: it uses PostgreSQL without contacting TMDB or introducing an ML/AI component.
+
+ANT-30 verified the complete flow from an empty disposable PostgreSQL database: migrations reached `8f3a2d7c1b4e`, the first seed created 12 movies, a repeated seed created none and preserved an edited record, local CRUD remained functional, and `Orbit of Glass` returned the expected recommendation order. Error and empty-result responses were also checked over HTTP. The commands and results are recorded in [local recommendation verification](docs/LOCAL_RECOMMENDATIONS_VERIFICATION.md).
 
 See [project context](docs/PROJECT_CONTEXT.md) for the agreed sequence and Docker decisions, and [AGENTS.md](AGENTS.md) for contributor instructions.
 
