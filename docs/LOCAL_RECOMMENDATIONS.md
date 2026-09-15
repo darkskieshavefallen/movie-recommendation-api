@@ -10,7 +10,7 @@ The rule is intentionally small enough to inspect and test. A recommendation exp
 
 ## Public operation
 
-The planned endpoint is:
+The endpoint is:
 
 ```text
 GET /movies/{movie_id}/recommendations?limit=5
@@ -129,4 +129,4 @@ Candidates `15`, `20`, and `25` have the same shared-genre count, so the year di
 - Genre normalization belongs in application schemas so create and update requests share one contract.
 - The recommendation read path does not commit, write, or contact an external integration.
 
-ANT-26 added persistent local genres, ANT-27 added the opt-in demo catalog, and ANT-28 implemented this ranking in a read-only service. The HTTP endpoint remains a separate ANT-29 task so transport behavior can be reviewed independently.
+ANT-26 added persistent local genres, ANT-27 added the opt-in demo catalog, ANT-28 implemented ranking in a read-only service, and ANT-29 exposed that service through the validated HTTP endpoint described above.

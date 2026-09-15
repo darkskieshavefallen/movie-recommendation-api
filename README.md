@@ -9,7 +9,7 @@
 
 > A learning project focused on building a production-ready REST API using FastAPI, PostgreSQL, SQLAlchemy Async, and modern Python development practices.
 
-Currently implements movie CRUD. External movie API integration and the recommendation engine are planned.
+Currently implements local movie CRUD, deterministic local recommendations, and read-only external movie search.
 
 ---
 
@@ -261,7 +261,20 @@ curl --fail "http://localhost:8000/movies/?limit=20"
 | POST | `/movies/` | Create a movie |
 | PUT | `/movies/{id}` | Update a movie |
 | DELETE | `/movies/{id}` | Delete a movie |
+| GET | `/movies/{id}/recommendations?limit={1-20}` | Recommend similar movies from the local catalog |
 | GET | `/external/movies/search?query={title}` | Search the external movie catalog without changing local records |
+
+### Local movie recommendations
+
+Seed the opt-in demo catalog as described above, then request recommendations for a local movie ID:
+
+```bash
+curl --fail "http://localhost:8000/movies/1/recommendations?limit=5"
+```
+
+The response contains the source ID and an ordered list of local movies. Each result includes `matching_genres` to explain the match. Ranking prefers more shared genres, then a closer release year, then the lower local ID. The optional `limit` defaults to `5` and accepts `1`–`20`; invalid input returns `422`, an unknown source returns `404`, and no matches returns `200` with an empty list.
+
+This path reads only the local PostgreSQL catalog. It does not call TMDB, import external content, or use an ML/AI model. See the [local recommendation contract](docs/LOCAL_RECOMMENDATIONS.md) for the complete ranking and genre rules.
 
 ### External movie search
 
@@ -356,7 +369,7 @@ docker compose run --rm --no-deps --entrypoint python api -m ruff check .
 
 On Windows, use `.venv\Scripts\python.exe`. If cache writes are restricted, add `-p no:cacheprovider` to pytest and `--no-cache` to Ruff.
 
-Verified on 2026-09-16: all 110 tests pass and Ruff checks pass. The suite covers local movie CRUD and genres, demo-catalog idempotency and target safety, deterministic recommendation ranking, external settings, TMDB normalization and failure mappings, dependency wiring, application lifecycle, and endpoint validation. External tests use mock transports or dependency overrides and never contact TMDB; unit tests do not require a live database. Separate disposable-database checks verified migrations, the opt-in demo seed, API reads, and Docker startup; see [verification results](docs/DOCKER_VERIFICATION.md).
+Verified on 2026-09-16: all 120 tests pass and Ruff checks pass. The suite covers local movie CRUD and genres, demo-catalog idempotency and target safety, deterministic recommendation ranking and HTTP behavior, external settings, TMDB normalization and failure mappings, dependency wiring, application lifecycle, and endpoint validation. External tests use mock transports or dependency overrides and never contact TMDB; unit tests do not require a live database. Separate disposable-database checks verified migrations, the opt-in demo seed, API reads, and Docker startup; see [verification results](docs/DOCKER_VERIFICATION.md).
 
 The Docker sprint (ANT-5–ANT-11) was merged into `main` through [PR #8](https://github.com/darkskieshavefallen/movie-recommendation-api/pull/8).
 
@@ -427,6 +440,10 @@ The helper pulled the immutable digest without a local build, started PostgreSQL
 Sprint 17 implements provider-independent, read-only movie search. ANT-18 selects TMDB API v3 and defines the smallest application contract, field mapping, error behavior, attribution requirements, and usage boundaries in [the external catalog decision](docs/EXTERNAL_MOVIE_API.md). ANT-19 adds validated provider settings and runtime-only token injection. ANT-20 defines the application schemas. ANT-21 adds the managed asynchronous TMDB client and normalization. ANT-22 maps provider failures to safe domain errors and HTTP responses. ANT-23 exposes `GET /external/movies/search` through the service and app-scoped client.
 
 ANT-24 completes local verification and documentation. On 2026-09-14, Docker Compose started the API with PostgreSQL and locally supplied integration settings; `/health`, `/health/db`, Swagger, and OpenAPI succeeded. One bounded request for `Alien` returned `200` with normalized results through both `curl` and Swagger. The credential and raw provider payload were not written to the repository or verification report. Automated tests remain deterministic: they replace external transport or dependencies and never contact TMDB.
+
+### Local recommendations (ANT-25–ANT-29)
+
+Sprint 18 adds normalized local genres, an opt-in fictional demo catalog, deterministic ranking, and `GET /movies/{movie_id}/recommendations`. The endpoint validates `movie_id` and `limit`, returns the shared genres behind every match, preserves the existing movie `404`, and returns an empty successful response when no candidate qualifies. This flow is local-only and read-only: it uses PostgreSQL without contacting TMDB or introducing an ML/AI component.
 
 See [project context](docs/PROJECT_CONTEXT.md) for the agreed sequence and Docker decisions, and [AGENTS.md](AGENTS.md) for contributor instructions.
 
