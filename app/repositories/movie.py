@@ -148,3 +148,14 @@ class MovieRepository:
         )
 
         return {(row.title, row.release_year) for row in result}
+
+    async def get_recommendation_candidates(
+        self,
+        source_movie_id: int,
+    ) -> list[Movie]:
+        """Return local movies other than the recommendation source."""
+        result = await self.session.execute(
+            select(Movie).where(Movie.id != source_movie_id)
+        )
+
+        return list(result.scalars().all())

@@ -356,7 +356,7 @@ docker compose run --rm --no-deps --entrypoint python api -m ruff check .
 
 On Windows, use `.venv\Scripts\python.exe`. If cache writes are restricted, add `-p no:cacheprovider` to pytest and `--no-cache` to Ruff.
 
-Verified on 2026-09-16: all 103 tests pass and Ruff checks pass. The suite covers local movie CRUD and genres, demo-catalog idempotency and target safety, external settings, TMDB normalization and failure mappings, dependency wiring, application lifecycle, and endpoint validation. External tests use mock transports or dependency overrides and never contact TMDB; unit tests do not require a live database. Separate disposable-database checks verified migrations, the opt-in demo seed, API reads, and Docker startup; see [verification results](docs/DOCKER_VERIFICATION.md).
+Verified on 2026-09-16: all 110 tests pass and Ruff checks pass. The suite covers local movie CRUD and genres, demo-catalog idempotency and target safety, deterministic recommendation ranking, external settings, TMDB normalization and failure mappings, dependency wiring, application lifecycle, and endpoint validation. External tests use mock transports or dependency overrides and never contact TMDB; unit tests do not require a live database. Separate disposable-database checks verified migrations, the opt-in demo seed, API reads, and Docker startup; see [verification results](docs/DOCKER_VERIFICATION.md).
 
 The Docker sprint (ANT-5–ANT-11) was merged into `main` through [PR #8](https://github.com/darkskieshavefallen/movie-recommendation-api/pull/8).
 

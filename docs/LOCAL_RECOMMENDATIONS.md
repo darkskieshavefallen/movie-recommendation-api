@@ -1,6 +1,6 @@
 # Local recommendation contract
 
-Updated: 2026-09-14.
+Updated: 2026-09-16.
 
 ## Scope
 
@@ -129,4 +129,4 @@ Candidates `15`, `20`, and `25` have the same shared-genre count, so the year di
 - Genre normalization belongs in application schemas so create and update requests share one contract.
 - The recommendation read path does not commit, write, or contact an external integration.
 
-Implementation begins in ANT-26 with persistent local genres. Ranking and the endpoint remain separate tasks so their behavior can be reviewed independently.
+ANT-26 added persistent local genres, ANT-27 added the opt-in demo catalog, and ANT-28 implemented this ranking in a read-only service. The HTTP endpoint remains a separate ANT-29 task so transport behavior can be reviewed independently.
