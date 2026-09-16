@@ -39,6 +39,9 @@ testpaths = ["tests"]
 python_files = "test_*.py"
 python_functions = "test_*"
 asyncio_mode = "auto"
+markers = [
+    "integration: tests that require an approved disposable PostgreSQL database",
+]
 
 [build-system]
 requires = ["setuptools>=61", "wheel"]

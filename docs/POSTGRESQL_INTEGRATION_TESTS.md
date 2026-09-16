@@ -71,5 +71,5 @@ INTEGRATION_DATABASE_URL='postgresql+asyncpg://integration:integration@localhost
   .venv/bin/python -m pytest -q
 ```
 
-The fixture and CI implementation in later Sprint 19 tasks must preserve this
-contract. This document alone changes no application behavior or data.
+The fixtures implement these checks before opening a connection. Later Sprint
+19 tasks add the application scenarios and the dedicated CI job.
