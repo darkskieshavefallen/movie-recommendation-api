@@ -406,7 +406,7 @@ On Windows, use `.venv\Scripts\python.exe`. If cache writes are restricted, add 
 
 Verified on 2026-09-16: 120 unit tests, 15 PostgreSQL integration tests, Ruff,
 and the Docker smoke check pass in [GitHub Actions run
-35126294248](https://github.com/darkskieshavefallen/movie-recommendation-api/actions/runs/35126294248).
+35126703208](https://github.com/darkskieshavefallen/movie-recommendation-api/actions/runs/35126703208).
 The integration suite verifies migrations, CRUD, seed idempotency and edit
 preservation, plus deterministic recommendation order through the real
 HTTP → FastAPI → Service → Repository → PostgreSQL path.
