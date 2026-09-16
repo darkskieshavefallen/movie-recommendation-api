@@ -10,6 +10,7 @@ from app.api import exception_handlers
 from app.api.exception_handlers import register_exception_handlers
 from app.core.exceptions import (
     ExternalMovieAuthenticationError,
+    ExternalMovieDisabledError,
     ExternalMovieInvalidResponseError,
     ExternalMovieRateLimitError,
     ExternalMovieRequestError,
@@ -22,6 +23,12 @@ from app.core.exceptions import (
 @pytest.mark.parametrize(
     ("error", "expected_status", "expected_detail", "retry_after"),
     [
+        (
+            ExternalMovieDisabledError(),
+            503,
+            "External movie catalog is disabled.",
+            None,
+        ),
         (
             ExternalMovieAuthenticationError(provider_status=401),
             502,

@@ -53,9 +53,25 @@ async def test_approved_database_is_migrated(
     integration_engine: AsyncEngine,
 ) -> None:
     async with integration_engine.connect() as connection:
-        revision = await connection.scalar(text("SELECT version_num FROM alembic_version"))
-        movie_table = await connection.scalar(text("SELECT to_regclass('public.movies')"))
+        revision = await connection.scalar(
+            text("SELECT version_num FROM alembic_version")
+        )
+        movie_table = await connection.scalar(
+            text("SELECT to_regclass('public.movies')")
+        )
+        constraints = set(
+            (
+                await connection.execute(
+                    text(
+                        "SELECT conname FROM pg_constraint "
+                        "WHERE conrelid = 'movies'::regclass"
+                    )
+                )
+            ).scalars()
+        )
 
-    assert revision == "8f3a2d7c1b4e"
+    assert revision == "c3d9a6f4b2e1"
     assert movie_table == "movies"
+    assert "ck_movies_title_length" in constraints
+    assert "ck_movies_release_year_range" in constraints
     assert os.environ["TMDB_BASE_URL"] == "https://tmdb.invalid/3"

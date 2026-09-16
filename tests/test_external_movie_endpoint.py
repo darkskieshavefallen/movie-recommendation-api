@@ -12,6 +12,7 @@ from app.api.exception_handlers import register_exception_handlers
 from app.api.external_movies import router
 from app.core.exceptions import (
     ExternalMovieAuthenticationError,
+    ExternalMovieDisabledError,
     ExternalMovieInvalidResponseError,
     ExternalMovieRateLimitError,
     ExternalMovieRequestError,
@@ -106,6 +107,19 @@ async def test_search_endpoint_returns_empty_results(
     assert response.json() == {"query": "Unknown title", "results": []}
 
 
+async def test_search_endpoint_returns_503_when_catalog_is_disabled():
+    """The optional endpoint fails safely without constructing a TMDB client."""
+    app = FastAPI()
+    app.state.tmdb_movie_client = None
+    app.include_router(router)
+    register_exception_handlers(app)
+
+    response = await get(app, "/external/movies/search?query=Alien")
+
+    assert response.status_code == 503
+    assert response.json() == {"detail": str(ExternalMovieDisabledError())}
+
+
 @pytest.mark.parametrize(
     "path",
     [
@@ -180,6 +194,7 @@ async def test_lifespan_exposes_one_client_and_closes_it(monkeypatch):
     client.__aexit__.return_value = None
     client_factory = MagicMock(return_value=client)
     monkeypatch.setattr(main_module, "TmdbMovieClient", client_factory)
+    monkeypatch.setattr(main_module.app_settings, "tmdb_enabled", True)
     app = FastAPI()
 
     async with main_module.lifespan(app):
@@ -189,3 +204,16 @@ async def test_lifespan_exposes_one_client_and_closes_it(monkeypatch):
     client_factory.assert_called_once_with(main_module.app_settings)
     client.__aenter__.assert_awaited_once_with()
     client.__aexit__.assert_awaited_once_with(None, None, None)
+
+
+async def test_lifespan_skips_client_when_catalog_is_disabled(monkeypatch):
+    """Local startup succeeds without a provider token or HTTP client."""
+    client_factory = MagicMock()
+    monkeypatch.setattr(main_module, "TmdbMovieClient", client_factory)
+    monkeypatch.setattr(main_module.app_settings, "tmdb_enabled", False)
+    app = FastAPI()
+
+    async with main_module.lifespan(app):
+        assert app.state.tmdb_movie_client is None
+
+    client_factory.assert_not_called()

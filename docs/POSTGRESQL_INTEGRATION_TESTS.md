@@ -47,9 +47,9 @@ Every integration test starts with empty application tables. The suite covers:
   and ID tie-breakers, limit, explanations, exclusions, empty results, and
   validation errors.
 
-Automated integration tests never call TMDB. Application settings use
-`https://tmdb.invalid/3` and a fake token; the suite does not exercise the
-external-catalog endpoint.
+Automated integration tests never call TMDB. The external integration is
+explicitly disabled; the suite verifies its safe `503` alongside the local
+catalog and uses a non-routable provider URL as defense in depth.
 
 ## Commands
 

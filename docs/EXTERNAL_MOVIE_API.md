@@ -38,7 +38,13 @@ page=1
 
 Only the first provider page is required in Sprint 17. Search, details, images, genres, and discovery must not be combined speculatively. `GET /3/movie/{movie_id}` is not needed because the search payload already supplies the minimal application fields.
 
-ANT-19 exposes the base URL, read access token, and timeout as the required `TMDB_BASE_URL`, `TMDB_READ_ACCESS_TOKEN`, and `TMDB_TIMEOUT_SECONDS` application settings. The token remains in the request header, local environment, and deployment secret storage; it must not appear in source control, logs, exception text, or query strings.
+Runtime integration is opt-in. `TMDB_ENABLED=false` is the default, requires no
+token, and leaves the local catalog fully operational; the external search
+endpoint returns a safe `503`. Enabling it requires `TMDB_ENABLED=true` and a
+non-empty `TMDB_READ_ACCESS_TOKEN`. `TMDB_BASE_URL` and
+`TMDB_TIMEOUT_SECONDS` have safe defaults. The token remains in the request
+header, local environment, and deployment secret storage; it must not appear in
+source control, logs, exception text, or query strings.
 
 ## Application search contract
 
@@ -85,6 +91,7 @@ Integration code will raise application-owned exceptions. The API layer will map
 
 | Situation | Internal classification | Public behavior |
 | --- | --- | --- |
+| TMDB integration is disabled | Optional capability disabled | `503 Service Unavailable` with `External movie catalog is disabled.` |
 | Missing, blank, or invalid application query | Request validation | `422 Unprocessable Entity`; provider is not called |
 | Valid search with no TMDB matches | Successful empty result | `200 OK` with the normalized query and `results: []` |
 | TMDB `401` or `403` | Provider authentication/configuration failure | `502 Bad Gateway` with a generic external-provider message |

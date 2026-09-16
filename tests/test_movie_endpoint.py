@@ -120,3 +120,24 @@ async def test_get_movie_endpoint_returns_empty_genres_for_existing_movie(
 
     assert response.status_code == 200
     assert response.json()["genres"] == []
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"title": "   ", "release_year": 2000},
+        {"title": "x" * 256, "release_year": 2000},
+        {"title": "Too early", "release_year": 1887},
+        {"title": "Too late", "release_year": 2101},
+    ],
+)
+async def test_invalid_movie_fields_return_422_before_service(
+    endpoint_app,
+    mock_movie_service,
+    payload,
+):
+    """API validation owns title/year failures instead of PostgreSQL."""
+    response = await request(endpoint_app, "POST", "/movies/", json=payload)
+
+    assert response.status_code == 422
+    mock_movie_service.create_movie.assert_not_awaited()

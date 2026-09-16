@@ -4,6 +4,7 @@ from fastapi import Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.core.exceptions import ExternalMovieDisabledError
 from app.integrations.tmdb import TmdbMovieClient
 from app.repositories.movie import MovieRepository
 from app.services.external_movie import ExternalMovieService
@@ -13,7 +14,10 @@ from app.services.recommendation import RecommendationService
 
 def get_tmdb_movie_client(request: Request) -> TmdbMovieClient:
     """Return the application-scoped external movie client."""
-    return request.app.state.tmdb_movie_client
+    client = request.app.state.tmdb_movie_client
+    if client is None:
+        raise ExternalMovieDisabledError()
+    return client
 
 
 def get_external_movie_service(

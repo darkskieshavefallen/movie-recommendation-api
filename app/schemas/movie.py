@@ -4,15 +4,24 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 MAX_GENRES = 10
 MAX_GENRE_LENGTH = 50
+MAX_TITLE_LENGTH = 255
+MIN_RELEASE_YEAR = 1888
+MAX_RELEASE_YEAR = 2100
 
 
 class MovieFields(BaseModel):
     """Fields shared by movie write and read schemas."""
 
-    title: str
-    release_year: int
+    title: str = Field(min_length=1, max_length=MAX_TITLE_LENGTH)
+    release_year: int = Field(ge=MIN_RELEASE_YEAR, le=MAX_RELEASE_YEAR)
     description: str | None = None
     genres: list[str] = Field(default_factory=list, max_length=MAX_GENRES)
+
+    @field_validator("title", mode="before")
+    @classmethod
+    def normalize_title(cls, value: Any) -> Any:
+        """Trim a string title before enforcing its public length bounds."""
+        return value.strip() if isinstance(value, str) else value
 
     @field_validator("genres", mode="before")
     @classmethod
