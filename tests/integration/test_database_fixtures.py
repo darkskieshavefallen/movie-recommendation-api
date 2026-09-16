@@ -72,6 +72,18 @@ async def read_migration_result(
         await engine.dispose()
 
 
+async def truncate_movies(database_url: URL) -> None:
+    """Leave the disposable database clean after the migration regression."""
+    engine = create_async_engine(database_url)
+    try:
+        async with engine.begin() as connection:
+            await connection.execute(
+                text("TRUNCATE TABLE movies RESTART IDENTITY")
+            )
+    finally:
+        await engine.dispose()
+
+
 @pytest.mark.parametrize(
     ("raw_url", "is_ci"),
     [
@@ -127,7 +139,10 @@ def test_constraint_migration_cleans_only_invalid_legacy_rows(
             "ck_movies_title_length": True,
         }
     finally:
-        command.upgrade(config, "head")
+        try:
+            command.upgrade(config, "head")
+        finally:
+            asyncio.run(truncate_movies(integration_database_url))
 
 
 async def test_approved_database_is_migrated(
