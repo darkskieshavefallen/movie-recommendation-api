@@ -46,12 +46,16 @@ async def integration_engine(
     integration_database_url: URL,
 ) -> AsyncIterator[AsyncEngine]:
     """Provide a disposable engine and clean rows even after test failure."""
+    # pytest gives async tests separate event loops. Do not let the application's
+    # global pool carry an asyncpg connection from one test loop into the next.
+    await application_engine.dispose()
     engine = create_async_engine(integration_database_url)
     async with engine.begin() as connection:
         await connection.execute(text("TRUNCATE TABLE movies RESTART IDENTITY"))
     try:
         yield engine
     finally:
+        await application_engine.dispose()
         async with engine.begin() as connection:
             await connection.execute(text("TRUNCATE TABLE movies RESTART IDENTITY"))
         await engine.dispose()
@@ -78,12 +82,3 @@ async def client(
         base_url="http://integration.test",
     ) as http_client:
         yield http_client
-
-
-@pytest.fixture(scope="session", autouse=True)
-def dispose_application_engine_after_suite() -> Iterator[None]:
-    """Release the application's global connection pool after the test session."""
-    yield
-    import asyncio
-
-    asyncio.run(application_engine.dispose())
