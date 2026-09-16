@@ -5,6 +5,7 @@ from fastapi.responses import JSONResponse
 
 from app.core.exceptions import (
     ExternalMovieAuthenticationError,
+    ExternalMovieDisabledError,
     ExternalMovieInvalidResponseError,
     ExternalMovieProviderError,
     ExternalMovieRateLimitError,
@@ -41,6 +42,7 @@ async def external_movie_provider_exception_handler(
 ) -> JSONResponse:
     """Map external movie failures to stable responses without provider details."""
     status_by_error = {
+        ExternalMovieDisabledError: status.HTTP_503_SERVICE_UNAVAILABLE,
         ExternalMovieAuthenticationError: status.HTTP_502_BAD_GATEWAY,
         ExternalMovieRateLimitError: status.HTTP_503_SERVICE_UNAVAILABLE,
         ExternalMovieTimeoutError: status.HTTP_504_GATEWAY_TIMEOUT,

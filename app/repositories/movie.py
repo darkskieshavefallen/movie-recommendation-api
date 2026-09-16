@@ -127,6 +127,7 @@ class MovieRepository:
         """
         result = await self.session.execute(
             select(Movie)
+            .order_by(Movie.id.asc())
             .offset(offset)
             .limit(limit)
         )

@@ -26,6 +26,13 @@ class ExternalMovieProviderError(AppError):
         super().__init__(self.public_message)
 
 
+class ExternalMovieDisabledError(ExternalMovieProviderError):
+    """The optional external movie catalog is not configured."""
+
+    code = "external_movie_disabled"
+    public_message = "External movie catalog is disabled."
+
+
 class ExternalMovieAuthenticationError(ExternalMovieProviderError):
     """The provider rejected the configured application credential."""
 

@@ -26,6 +26,7 @@ def tmdb_settings() -> Settings:
         app_title="Test API",
         app_version="test",
         database_url="postgresql+asyncpg://test:test@localhost/test",
+        tmdb_enabled=True,
         tmdb_base_url="https://tmdb.invalid/3",
         tmdb_read_access_token="test-fake-tmdb-token",
         tmdb_timeout_seconds=7,

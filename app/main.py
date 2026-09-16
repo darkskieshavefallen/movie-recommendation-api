@@ -2,6 +2,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.exception_handlers import register_exception_handlers
 from app.api.external_movies import router as external_movies_router
@@ -21,6 +22,11 @@ setup_logging(log_level=app_settings.log_level)
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Own the reusable external HTTP client's application lifecycle."""
+    if not app_settings.tmdb_enabled:
+        app.state.tmdb_movie_client = None
+        yield
+        return
+
     async with TmdbMovieClient(app_settings) as client:
         app.state.tmdb_movie_client = client
         yield
@@ -36,6 +42,14 @@ app = FastAPI(
 )
 
 register_exception_handlers(app)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=app_settings.cors_allowed_origins,
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["*"],
+)
 
 app.include_router(health_router)
 app.include_router(movies_router)

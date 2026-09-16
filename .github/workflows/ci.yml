@@ -20,6 +20,8 @@ jobs:
       # Unit tests never connect to PostgreSQL.
       DATABASE_URL: postgresql+asyncpg://ci:ci@127.0.0.1:5432/movie_ci
       LOG_LEVEL: INFO
+      CORS_ALLOWED_ORIGINS: '["http://localhost:5173"]'
+      TMDB_ENABLED: "false"
       # Settings validation requires fake values; tests never call TMDB.
       TMDB_BASE_URL: https://tmdb.invalid/3
       TMDB_READ_ACCESS_TOKEN: ci-fake-tmdb-read-access-token
@@ -67,6 +69,8 @@ jobs:
       DATABASE_URL: postgresql+asyncpg://integration:integration@127.0.0.1:5432/movie_recommendation_integration_ci
       INTEGRATION_DATABASE_URL: postgresql+asyncpg://integration:integration@127.0.0.1:5432/movie_recommendation_integration_ci
       LOG_LEVEL: INFO
+      CORS_ALLOWED_ORIGINS: '["http://localhost:5173"]'
+      TMDB_ENABLED: "false"
       TMDB_BASE_URL: https://tmdb.invalid/3
       TMDB_READ_ACCESS_TOKEN: ci-fake-tmdb-read-access-token
       TMDB_TIMEOUT_SECONDS: "5"
@@ -116,6 +120,8 @@ jobs:
       APP_VERSION: ci
       DATABASE_URL: postgresql+asyncpg://ci:ci@127.0.0.1:5432/movie_ci
       LOG_LEVEL: INFO
+      CORS_ALLOWED_ORIGINS: '["http://localhost:5173"]'
+      TMDB_ENABLED: "false"
       TMDB_BASE_URL: https://tmdb.invalid/3
       TMDB_READ_ACCESS_TOKEN: ci-fake-tmdb-read-access-token
       TMDB_TIMEOUT_SECONDS: "5"

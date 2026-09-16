@@ -57,12 +57,15 @@ class TmdbMovieClient:
         transport: httpx.AsyncBaseTransport | None = None,
     ) -> None:
         """Create one reusable HTTP client from validated application settings."""
+        token = settings.tmdb_read_access_token
+        if token is None:
+            raise ValueError("TMDB client requires an enabled integration token")
         self._http_client = httpx.AsyncClient(
             base_url=str(settings.tmdb_base_url),
             headers={
                 "Authorization": (
                     "Bearer "
-                    f"{settings.tmdb_read_access_token.get_secret_value()}"
+                    f"{token.get_secret_value()}"
                 ),
                 "Accept": "application/json",
             },

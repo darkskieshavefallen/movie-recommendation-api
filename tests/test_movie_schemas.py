@@ -4,7 +4,14 @@ import pytest
 from pydantic import ValidationError
 
 from app.models.movie import Movie
-from app.schemas.movie import MovieCreate, MovieRead, MovieUpdate
+from app.schemas.movie import (
+    MAX_RELEASE_YEAR,
+    MAX_TITLE_LENGTH,
+    MIN_RELEASE_YEAR,
+    MovieCreate,
+    MovieRead,
+    MovieUpdate,
+)
 
 
 @pytest.mark.parametrize("schema_type", [MovieCreate, MovieUpdate])
@@ -17,6 +24,7 @@ def test_movie_write_schema_normalizes_and_sorts_genres(schema_type):
     )
 
     assert movie.genres == ["drama", "science fiction"]
+    assert movie.title == "Orbit"
 
 
 @pytest.mark.parametrize("schema_type", [MovieCreate, MovieUpdate])
@@ -41,6 +49,25 @@ def test_movie_write_schema_rejects_invalid_genres(genres, error):
     """Genre validation rejects ambiguous or excessive values."""
     with pytest.raises(ValidationError, match=error):
         MovieCreate(title="Orbit", release_year=2000, genres=genres)
+
+
+@pytest.mark.parametrize(
+    ("title", "release_year", "error"),
+    [
+        ("   ", 2000, "at least 1 character"),
+        ("x" * (MAX_TITLE_LENGTH + 1), 2000, "at most 255 characters"),
+        ("Too early", MIN_RELEASE_YEAR - 1, "greater than or equal to 1888"),
+        ("Too late", MAX_RELEASE_YEAR + 1, "less than or equal to 2100"),
+    ],
+)
+def test_movie_write_schema_rejects_invalid_title_and_year(
+    title,
+    release_year,
+    error,
+):
+    """Public bounds fail before repository or PostgreSQL access."""
+    with pytest.raises(ValidationError, match=error):
+        MovieCreate(title=title, release_year=release_year)
 
 
 def test_movie_read_supports_migrated_existing_movie_without_genres():

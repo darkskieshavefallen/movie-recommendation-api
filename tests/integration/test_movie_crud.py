@@ -118,6 +118,26 @@ async def test_unknown_writes_rollback_without_changing_other_movies(
                 "genres": [],
             },
         ),
+        (
+            "POST",
+            "/movies/",
+            {"title": "   ", "release_year": 2000, "genres": []},
+        ),
+        (
+            "POST",
+            "/movies/",
+            {"title": "x" * 256, "release_year": 2000, "genres": []},
+        ),
+        (
+            "POST",
+            "/movies/",
+            {"title": "Too early", "release_year": 1887, "genres": []},
+        ),
+        (
+            "POST",
+            "/movies/",
+            {"title": "Too late", "release_year": 2101, "genres": []},
+        ),
     ],
 )
 async def test_invalid_movie_requests_do_not_persist_rows(
@@ -130,3 +150,38 @@ async def test_invalid_movie_requests_do_not_persist_rows(
 
     assert response.status_code == 422
     assert (await client.get("/movies/")).json() == []
+
+
+async def test_movie_list_pagination_has_stable_id_order(
+    client: httpx.AsyncClient,
+) -> None:
+    """Offset and limit operate on an explicit ascending local-ID order."""
+    created = []
+    for title in ["Third alphabetically", "First alphabetically", "Middle"]:
+        response = await client.post(
+            "/movies/",
+            json={"title": title, "release_year": 2000, "genres": []},
+        )
+        assert response.status_code == 201
+        created.append(response.json())
+
+    first_page = (await client.get("/movies/?offset=0&limit=2")).json()
+    second_page = (await client.get("/movies/?offset=2&limit=2")).json()
+
+    assert [movie["id"] for movie in first_page] == [
+        created[0]["id"],
+        created[1]["id"],
+    ]
+    assert [movie["id"] for movie in second_page] == [created[2]["id"]]
+
+
+async def test_local_core_and_disabled_external_catalog_coexist(
+    client: httpx.AsyncClient,
+) -> None:
+    """Local health and catalog remain available while TMDB is disabled."""
+    health = await client.get("/health")
+    external = await client.get("/external/movies/search?query=Alien")
+
+    assert health.status_code == 200
+    assert external.status_code == 503
+    assert external.json() == {"detail": "External movie catalog is disabled."}

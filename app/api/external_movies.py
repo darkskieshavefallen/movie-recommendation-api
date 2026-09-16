@@ -29,7 +29,7 @@ router = APIRouter(
         },
         status.HTTP_503_SERVICE_UNAVAILABLE: {
             "model": ExternalMovieErrorResponse,
-            "description": "Provider unavailable or rate limited.",
+            "description": "Catalog disabled, unavailable, or rate limited.",
         },
         status.HTTP_504_GATEWAY_TIMEOUT: {
             "model": ExternalMovieErrorResponse,

@@ -1,135 +1,107 @@
-# Контекст проекта и текущий спринт
+# Контекст проекта
 
-Обновлено: 2026-09-16. Факты ниже — снимок состояния, перед изменениями перепроверь их.
+Обновлено: 2026-09-17. Это краткий снимок актуального состояния. История
+изменений хранится в Git, GitHub PR и Linear.
 
-## Цель и состояние
+## Назначение
 
-Учебный backend рекомендаций фильмов. Реализованы CRUD локальных фильмов, детерминированные рекомендации только по собственному локальному каталогу и независимый read-only поиск во внешнем каталоге TMDB. Локальные рекомендации не используют данные TMDB или ML/AI; добавление ML/AI при подключённом TMDB остаётся заблокировано условиями использования, пока не будет получено письменное разрешение, заменён провайдер либо полностью удалена и отделена TMDB-интеграция.
+Movie Recommendation API — учебный backend на FastAPI для локального каталога
+фильмов и детерминированных рекомендаций. Основной продуктовый контур работает
+без внешнего провайдера:
 
-Стек: Python 3.13, FastAPI, Pydantic v2, SQLAlchemy async, asyncpg, PostgreSQL, Alembic, pytest, Ruff. Есть DI, сервисы/репозитории, обработчики ошибок и централизованное логирование.
+- CRUD фильмов в PostgreSQL;
+- явно запускаемый fictional demo-каталог;
+- рекомендации по общим жанрам и близости года выпуска;
+- опциональный read-only поиск TMDB без импорта данных в локальную БД;
+- OpenAPI, health/readiness endpoints, Docker и CI.
 
-Текущая точка: Docker-спринт влит через PR #8, Sprint 16 — через PR #9, а итоговая документация — через PR #10. Sprint 17 реализован задачами ANT-18–ANT-24 и влит через PR #11. Sprint 18 — Local catalog and first recommendations — реализован задачами ANT-25–ANT-30 и влит через PR #12. Sprint 19 реализуется задачами ANT-31–ANT-37 в общей ветке `feature/postgresql-integration-tests-sprint`; draft PR #13 ожидает отдельного ревью и решения пользователя о merge.
+React frontend будет разрабатываться в отдельном репозитории. Этот репозиторий
+остаётся backend-сервисом и источником HTTP-контракта.
 
-ANT-12: опубликован коммит `13352d5`, добавлен `.github/workflows/ci.yml` для PR в main и push в main: Ubuntu, Python 3.13, установка `.[dev]`, Ruff и pytest. Настройки заданы явно в env без секретов; PostgreSQL не запускается, доступ к БД подменён в существующих тестах. Локально, в копии без `.env` и на чистом GitHub runner проверки прошли: 16 тестов, Ruff. Удалённый запуск: https://github.com/darkskieshavefallen/movie-recommendation-api/actions/runs/34412395887. Ссылки на коммит, ветку и PR прикреплены к Linear; задача закрыта.
+## Архитектура и стек
 
-ANT-13: после тестов в тот же job добавлены определение `CI_IMAGE=movie-recommendation-api:<git rev-parse HEAD>`, `docker build --tag "$CI_IMAGE" .` и проверка доступности образа через `docker image inspect`. Тег передаётся следующим шагам через `GITHUB_ENV`. Сборка использует существующие Dockerfile и .dockerignore; образ доступен следующему шагу в локальном Docker runner без пересборки. Для PR тег соответствует фактически проверяемому merge-коммиту GitHub. Ошибки сборки/inspect не игнорируются. README описывает этот контракт. Проверены синтаксис YAML (Psych), shell-команд (`bash -n`) и `git diff --check`; результат удалённой сборки после отправки коммита фиксируется в PR #9 и Linear. Запуск с PostgreSQL — ANT-14, публикация образа — последующие задачи, пока не реализованы.
+Основная граница: `API -> Service -> Repository -> PostgreSQL`.
 
-Docker Desktop установлен. В терминале агента команда доступна как `/Users/anton/.docker/bin/docker`; для сборки может потребоваться добавить `/Applications/Docker.app/Contents/Resources/bin` в `PATH`. Compose-запуск API с PostgreSQL, миграциями и обоими health-маршрутами проверен в ANT-10, ANT-11 и повторно с реальной TMDB-конфигурацией в ANT-24. `.env`, `.venv` и IDE-артефакты исключены из build context.
+- Router отвечает за HTTP, зависимости и сериализацию.
+- Service содержит бизнес-логику и границы транзакций.
+- Repository выполняет доступ к данным и не делает `commit`.
+- Доменные исключения преобразуются в HTTP-ответы централизованно.
 
-## Выявленные вопросы
+Стек: Python 3.13, FastAPI, Pydantic v2, async SQLAlchemy, asyncpg,
+PostgreSQL 16, Alembic, pytest, Ruff, Docker Compose и GitHub Actions.
 
-- ANT-17 завершена после merge. README получил CI badge, явные стадии pipeline и раздельные roadmap-пункты. Добавлен `docs/CI_VERIFICATION.md` с цепочкой доставки и run-ссылками. Намеренно красный run https://github.com/darkskieshavefallen/movie-recommendation-api/actions/runs/34480678535 доказал fail-fast: Ruff и 16 тестов прошли, временный `exit 1` упал, а Docker build/smoke/export и publish job были skipped; после удаления шага PR вернулся в зелёное состояние. Post-merge run https://github.com/darkskieshavefallen/movie-recommendation-api/actions/runs/34481819321 прошёл полностью и опубликовал `ghcr.io/darkskieshavefallen/movie-recommendation-api:sha-64746bbb1ea442e0ea7dff14581ab173c6a87d00` с digest `sha256:aca66f496b9eeead4fed2a17baf6f65aaecb6a87c9db9cb7ecf1c7b9b404e190`. Реальный pull/start по digest без локальной сборки и логина подтвердил миграцию `474e3311e20a`, HTTP 200 на `/health` и `/health/db`, а cleanup удалил контейнеры, сеть и disposable volume. На Apple Silicon Docker использовал Linux/amd64 emulation с предупреждением; результат успешен. В Actions также было неблокирующее предупреждение о переводе `actions/upload-artifact@v4` с Node.js 20 на Node.js 24.
-- ANT-16 опубликована коммитом `3c94252`; PR CI https://github.com/darkskieshavefallen/movie-recommendation-api/actions/runs/34479175587 прошёл за 1:28, publish job был ожидаемо пропущен. Compose config и mocked-Docker сценарии подтверждены; последующий реальный pull зафиксирован в результате ANT-17. Ссылки прикреплены к Linear, задача закрыта.
+## Текущее состояние
 
-- ANT-16: добавлены standalone `docker-compose.ghcr.yml` без build и `.github/scripts/verify-published-image.sh`. Конфигурация требует APP_IMAGE с полным sha-<40 hex> тегом или sha256:<64 hex> digest, всегда делает pull, использует PostgreSQL и порт API 18000 (переопределяется API_PORT). Скрипт создаёт уникальный project `movie-ghcr-verify-<pid>`, запускает `up --pull always --no-build --wait --wait-timeout 120`, переиспользует проверку Alembic heads и обоих health endpoints, выводит логи при ошибке и через EXIT trap удаляет контейнеры, сеть и disposable volume. Dev docker-compose.yml не изменён. README описывает public/private pull и PAT classic read:packages. До merge были проверены Compose config, отсутствие build, shell-ветви и PR; фактический pull после публикации подтверждён в ANT-17.
-- ANT-15 опубликована коммитом `283a56a`; PR CI https://github.com/darkskieshavefallen/movie-recommendation-api/actions/runs/34477878667 прошёл за 54 секунды, оба export-шага и publish job были корректно пропущены. Последующие push и digest из `main` подтверждены в ANT-17. Ссылки прикреплены к Linear, задача закрыта.
+Спринты Docker/CI, внешнего каталога, локальных рекомендаций и PostgreSQL
+integration tests влиты в `main`. Sprint 19 завершён через PR #13.
 
-- ANT-15: после успешного smoke на push в main checks job экспортирует ровно проверенный CI_IMAGE через docker save и upload-artifact (retention 1 day). Отдельный publish job с единственным `packages: write` скачивает artifact, делает docker load, сверяет image ID с output checks job, назначает `ghcr.io/darkskieshavefallen/movie-recommendation-api:sha-<checked_sha>` и отправляет через GITHUB_TOKEN без пересборки. Затем `docker buildx imagetools inspect` читает registry digest; image@digest пишется в job summary и outputs. В PR оба шага экспорта и весь publish job пропускаются, поэтому запись в GHCR возможна только после успешного push в main. Локально проверяем YAML/shell и PR skip; реальную аутентификацию, push, digest и создаваемый package можно подтвердить только после merge, который требует отдельного поручения пользователя.
-- ANT-14 опубликована коммитом `a0534d8`; CI https://github.com/darkskieshavefallen/movie-recommendation-api/actions/runs/34414022339 прошёл за 52 секунды. PostgreSQL и API стали healthy, expected/actual Alembic revision — `474e3311e20a`, /health и /health/db вернули 200. Cleanup удалил оба контейнера, сеть и volume. Ссылки прикреплены к Linear, задача закрыта.
+Текущая задача — ANT-38, ветка `feature/backend-retro-stabilization`. Она
+подготавливает backend к отдельному frontend:
 
-- ANT-14: текущее поручение после ANT-13 — проверка запуска с PostgreSQL в CI. Добавлены `.github/compose.ci.yml` и `.github/scripts/verify-smoke.sh`; workflow запускает уже собранный CI_IMAGE без пересборки, с исходным entrypoint и отдельной PostgreSQL 16. Проект `movie-ci-<run-id>-<attempt>` изолирует сеть и disposable volume, порты не публикуются, .env не читается. `up --wait --wait-timeout 120` ожидает healthchecks; скрипт сравнивает реальные ревизии БД с Alembic heads образа и требует 200 от /health и /health/db. На сбое выводятся логи, always-cleanup удаляет только ресурсы CI-проекта. Локально прошли Compose config, YAML parsing, bash -n и пять проверок скрипта с подменённым Docker (успех, несовпадение ревизии, пустой head, ошибка БД, ошибка HTTP); ошибки сохраняют ненулевой код. Локальный Docker daemon выключен; реальные результаты GitHub runner записываются в PR #9 и Linear после отправки. CRUD и публикация образа не входят в ANT-14.
-- ANT-13 опубликована коммитом `c7b4182`; CI https://github.com/darkskieshavefallen/movie-recommendation-api/actions/runs/34413058681 прошёл за 39 секунд: Ruff, 16 тестов, сборка и inspect. Тег совпал с SHA checkout `778a33b9c627eadce5e46d4f255c7167b687b972`, ID собранного образа совпал с результатом inspect. Ссылки прикреплены к Linear, задача закрыта.
+- TMDB отключён по умолчанию и включается только через `TMDB_ENABLED=true` с
+  настроенным токеном;
+- локальные маршруты не зависят от TMDB, отключённый внешний поиск возвращает
+  безопасный `503`;
+- CORS принимает только явный список origin без глобального wildcard;
+- название фильма нормализуется и ограничено 1–255 символами;
+- год выпуска ограничен диапазоном 1888–2100;
+- ограничения продублированы в PostgreSQL CHECK constraints;
+- список фильмов явно сортируется по локальному ID для стабильной пагинации;
+- корневой README сокращён, добавлена равнозначная русская версия и MIT License.
 
-- 8 сентября, ANT-11: на свежем изолированном Compose-проекте movie-ant11-20260908 (порт 18000, без .env) проверены startup, healthcheck, автоматическая миграция 474e3311e20a, /health, /health/db, Swagger HTML/OpenAPI, полный CRUD и сохранность изменённой записи после down/up без удаления volume. После проверки тестовая запись удалена, тестовые контейнеры остановлены, volume сохранён. Основной проект на 8000 не затронут. Локальные pytest — 16 passed, Ruff проходит. README содержит Docker/local запуск, конфигурацию, остановку, volume и ограничения. Подробности — docs/DOCKER_VERIFICATION.md. Исторические ограничения предыдущих этапов ниже относятся к моменту их выполнения.
+Фиксированная верхняя граница года выбрана намеренно: динамическое значение
+вроде «текущий год + N» нельзя согласованно закрепить постоянным PostgreSQL
+CHECK constraint. При изменении продуктового контракта диапазон обновляется
+отдельной миграцией.
 
-- 8 сентября, ANT-10: добавлен docker-compose.yml с сервисами api/db, PostgreSQL 16, healthcheck и depends_on: service_healthy, volume postgres_data. Docker-БД использует отдельные учебные реквизиты из Compose; DATABASE_URL в контейнере указывает на db, локальный .env не менялся. Порт API опубликован на 127.0.0.1:8000; порт БД на Mac не опубликован. Проверены compose config --quiet и up --build -d --wait: PostgreSQL healthy, автоматическая миграция 474e3311e20a применена, Uvicorn PID 1. /health, /health/db и /movies/ вернули 200 (список пуст). Контейнеры оставлены работающими; volume movie-recommendation-api_postgres_data создан. Полный CRUD и сохранность данных после перезапуска — ANT-11.
+База содержит только вымышленные demo/test-данные. Поэтому миграция ANT-38
+удаляет ранее допустимые, но несовместимые строки с пустым названием или годом
+вне 1888–2100, сохраняя остальные записи, а затем валидирует CHECK constraints.
 
-- 8 сентября, ANT-9: добавлен исполняемый docker-entrypoint.sh с `set -e`, `alembic upgrade head` и `exec "$@"`, подключён ENTRYPOINT в Dockerfile. Реальный запуск выявил ошибку регистрации editable-пакета до копирования исходников (ModuleNotFoundError: app); исправлено повторной регистрацией `pip install --no-deps -e .` после COPY исходников. Образ ant-9 собран, 16 тестов проходят локально и в контейнере, Ruff проходит. Тесты проверяют порядок, код ошибки, аргументы с пробелами и сохранение PID через exec. Реальный Alembic при недоступной тестовой БД завершает контейнер кодом 1, Uvicorn не запускается. Успешная миграция на живой БД в контейнере ещё не проверялась; Compose и отдельный контейнер миграций не добавлялись.
+## Конфигурация
 
-- 8 сентября, ANT-8: добавлен .dockerignore для .env и локальных вариантов (с сохранением .env.example), Git/IDE/assistant-файлов, venv, Python-кэшей, логов и результатов сборки. Обычная сборка из корня проекта успешна: `movie-recommendation-api:ant-8`. Временная диагностическая сборка проверила отсутствие локальных файлов в фактическом контексте и доступность исходников, тестов, миграций и метаданных. Следующий этап — ANT-9 (entrypoint и миграции); Dockerfile в ANT-8 не менялся.
+Минимальная локальная конфигурация описана в `.env.example`. Важные настройки:
 
-- 7 сентября, ANT-5: сервис явно выполняет rollback при MovieNotFoundError в update/delete, завершая транзакцию поиска перед повторным выбросом исключения. Логирование 404 остаётся в HTTP-обработчике. Все 13 unit-тестов проходят; тесты отсутствующего фильма также проверяют отсутствие refresh и ошибочных логов. Следующий шаг — ANT-6. Задача ожидает приёмки пользователя.
-- 7 сентября, ANT-6: Ruff 0.16.6 проходит. В pyproject.toml явно дополнены проверки E4/E7/E9/F/I/UP/B, Alembic обозначен сторонним пакетом. Depends переведён на Annotated во всех зависимостях и маршрутах, исправлены импорты и аннотации Python 3.13. Все 14 тестов проходят, включая проверку общей сессии сервиса/репозитория и её очистки. OpenAPI до/после совпадает; генерация SQL Alembic offline успешна. Следующий шаг — ANT-7; ANT-6 ожидает приёмки пользователя.
-- 5 сентября PostgreSQL отвечал на localhost:5432, но роль `movie_app` отсутствовала. Это исторический результат, не доказательство текущего состояния. База по конфигурации называлась `movie_recommendation`.
-- 7 сентября локальный запуск подтверждён: PostgreSQL 16 запущен через Homebrew; созданы отсутствовавшие роль `movie_app` и БД `movie_recommendation` с настройками из `.env`. Применена миграция `474e3311e20a` (`alembic upgrade head`). Uvicorn запущен через `.venv/bin/python -m uvicorn app.main:app --reload`; `/health`, `/health/db`, `/movies/` и `/docs` вернули 200, список фильмов пуст. Сценарии записи CRUD не проверялись. Следующий шаг — ANT-5, затем ANT-6 перед Docker.
-- PyCharm сообщает системный SDK Python 3.13.15; команды проверок и запуска выполнялись через `.venv/bin/python` согласно AGENTS.md. Настройки IDE не менялись.
-- `/health` возвращал 200 при проверке внутри процесса; интеграционных тестов БД/API в проверенном наборе нет.
-- При последней проверке пользовательские изменения: `.idea/modules.xml`, `.idea/vcs.xml`.
+- `DATABASE_URL` — PostgreSQL connection URL;
+- `CORS_ALLOWED_ORIGINS` — JSON-список явных frontend origins;
+- `TMDB_ENABLED=false` — внешний каталог по умолчанию выключен;
+- `TMDB_READ_ACCESS_TOKEN` обязателен только при включённом TMDB.
 
-## Linear
+Настоящие credentials нельзя коммитить. `/health` подтверждает только жизнь
+процесса; готовность PostgreSQL проверяет `/health/db`.
 
-Проект: https://linear.app/dshf/project/movie-recommendation-api-1f35c4e4ad7e/issues
+## Проверки
 
-Все семь задач созданы с критериями готовности и зависимостями. Календарные cycles, сроки и исполнители не назначены. Номера 15.2–15.6 — учебные этапы; после последнего решения пользователя они не требуют отдельных PR.
+Быстрый набор:
 
-| Задача | Работа | Зависимость |
-| --- | --- | --- |
-| ANT-5 | Согласовать rollback и исправить два тестовых падения | — |
-| ANT-6 | Привести Ruff к зелёному состоянию | — |
-| ANT-7 | 15.2: базовый Dockerfile | ANT-5, ANT-6 |
-| ANT-8 | 15.3: .dockerignore | ANT-7 |
-| ANT-9 | 15.4: entrypoint и миграции | ANT-8 |
-| ANT-10 | 15.5: Compose с PostgreSQL | ANT-9 |
-| ANT-11 | 15.6: полный запуск, smoke-проверка и README | ANT-10 |
+```bash
+.venv/bin/python -m ruff check .
+.venv/bin/python -m pytest -q -m "not integration"
+```
 
-## Организация CI-спринта
+PostgreSQL integration suite требует отдельную disposable-базу и переменную
+`INTEGRATION_DATABASE_URL`; подробный safety-контракт находится в
+`docs/POSTGRESQL_INTEGRATION_TESTS.md`. CI запускает quality и integration jobs
+независимо, а Docker build/smoke — только после их успеха.
 
-Спринт завершён в общей ветке `feature/ci-sprint` и влит через PR #9. Каждая задача ANT-12–ANT-17 была опубликована отдельным коммитом с ANT-идентификатором; ссылки на коммиты, ветку и общий PR прикреплены к Linear. После merge успешно проверены полный `main` pipeline, публикация в GHCR и запуск точного digest.
+Итоговые результаты конкретного изменения фиксируются в соответствующем PR и
+Linear-задаче, чтобы этот документ не превращался в журнал запусков.
 
-## Организация Sprint 17
+## Ограничения и следующие шаги
 
-Общая ветка — `feature/external-catalog-sprint`, общий draft PR создаётся с первой задачей. Для ANT-18–ANT-24 сохраняется отдельный коммит на задачу с ANT-идентификатором; после публикации ссылки на коммит, ветку, PR и CI прикрепляются к Linear.
+- Локальные рекомендации не используют TMDB или ML/AI.
+- ML/AI поверх данных TMDB не добавляется без письменного разрешения
+  провайдера, смены провайдера либо полного отделения интеграции; подробности —
+  в `docs/EXTERNAL_MOVIE_API.md`.
+- Автоматический demo seed намеренно не выполняется при startup или миграциях.
+- Ближайший продуктовый этап после ANT-38 — React frontend в отдельном
+  репозитории; server deployment остаётся более поздним этапом.
 
-ANT-18: по официальной документации на 12 сентября сравнены TMDB API v3 и OMDb. Для read-only поиска выбран TMDB: Bearer token не попадает в URL, search payload уже содержит минимальные поля приложения, а HTTP/status-коды и rate limiting документированы лучше. Единственная нужная операция — `GET /3/search/movie`; details lookup не требуется. Провайдерские `id`, `title`, `release_date`, `overview` нормализуются в `external_id`, `title`, `release_year`, `description`. Пустой результат остаётся успешным; validation/auth/rate-limit/timeout/outage/malformed-response получают заранее определённое поведение. Решение и источники — `docs/EXTERNAL_MOVIE_API.md`.
+## Рабочие ссылки
 
-Граница лицензии: TMDB разрешает бесплатное некоммерческое использование с обязательной атрибуцией, но текущие API Terms запрещают использовать TMDB API или content вообще «in connection with» ML/AI-приложением. Решение ANT-18 относится только к приложению с каталожным поиском без ML/AI-компонента. До добавления любого ML/AI-компонента нужно получить письменное разрешение TMDB на совместное использование, заменить провайдера либо удалить и полностью отделить TMDB-интеграцию от ML/AI-приложения. Простого запрета передавать TMDB-данные в модель недостаточно. Production-код, настройки и секреты в ANT-18 не добавляются.
-
-ANT-19: `Settings` дополнен обязательными `TMDB_BASE_URL`, `TMDB_READ_ACCESS_TOKEN`, `TMDB_TIMEOUT_SECONDS`. URL типизирован и допускает только HTTPS без credentials/query/fragment, token хранится в `SecretStr` и не может быть пустым, timeout — конечное положительное число. `.env.example` содержит безопасный placeholder. Development и GHCR Compose требуют token из локального окружения или `.env` и не содержат credential; значения передаются контейнеру только runtime. Workflow и CI Compose используют явные fake URL/token и не обращаются к провайдеру. Тесты проверяют валидную конфигурацию, redaction token, отсутствующее обязательное поле и некорректные значения; существующий dependency test получил явные fake-настройки.
-
-ANT-20: добавлены provider-independent Pydantic-схемы внешнего поиска. Поисковая строка обрезается и должна содержать 1–200 символов. Результат требует непустые `external_id` и `title`, безопасно допускает отсутствие `release_year` и `description`, а единый envelope всегда содержит нормализованный `query` и список `results`. Лишние поля запрещены, поэтому TMDB-specific payload не может случайно стать частью публичного контракта. Схемы не используют repository или PostgreSQL; тесты покрывают валидные данные, пустые optional-поля, неверные required/optional-поля и ноль, один или несколько результатов.
-
-ANT-21: добавлен `TmdbMovieClient` с одним переиспользуемым `httpx.AsyncClient` и async context manager для гарантированного закрытия соединений. Клиент использует base URL, Bearer token и timeout из валидированных настроек, отправляет только согласованные query-параметры и переводит первый TMDB result page в application-owned схемы. Внутренние TMDB payload-модели остаются в `app/integrations/`, игнорируют ненужные поля провайдера и отклоняют неверные обязательные значения; пустой список остаётся успешным ответом. Тесты используют только `httpx.MockTransport`, проверяют запрос, нормализацию, пустой ответ, malformed payload, отсутствие credential/URL в логах и закрытие клиента. Перевод HTTPX/Pydantic ошибок в доменные исключения остаётся задачей ANT-22.
-
-ANT-22: внешний клиент переводит timeout, connection failure, provider status и malformed payload в application-owned исключения без сохранения provider body, полного URL или текста HTTPX-ошибки. `401/403` и прочие `4xx`/invalid response получают `502`, `429` и unavailable — `503`, timeout/`504` — `504`; безопасный целочисленный `Retry-After` может быть передан клиенту. Общий FastAPI handler возвращает `{"detail": "<safe message>"}` и логирует только category code, method, path и provider status без query/credential. Тесты на `MockTransport` покрывают все mappings, invalid JSON/data, сетевые ошибки и заголовок; отдельные API-тесты подтверждают публичные ответы, безопасные логи и неизменный CRUD `404`.
-
-ANT-23: добавлен read-only `GET /external/movies/search?query=...` по цепочке API → `ExternalMovieService` → `TmdbMovieClient`; зависимость PostgreSQL в этот flow не входит. Pydantic query-model обрезает строку и отклоняет missing/blank/>200 значений с `422` до provider call. Один HTTPX-клиент создаётся в FastAPI lifespan, доступен через app state и закрывается на shutdown. OpenAPI описывает query, provider-independent `200`, автоматический `422` и domain-mapped `502/503/504`. Endpoint-тесты заменяют integration dependency на `AsyncMock`, не используют сеть и покрывают normal/empty/error/validation responses, OpenAPI и lifecycle.
-
-ANT-24: полный локальный поток подтверждён 14 сентября 2026 года. Development Compose собрал и запустил API с PostgreSQL и локально переданным API Read Access Token; миграции применились, контейнеры стали healthy, `/health` и `/health/db` вернули `200`, Swagger и OpenAPI содержали внешний маршрут. Один ограниченный реальный поиск `Alien` через HTTP и Swagger вернул `200` и 20 нормализованных результатов; токен и сырой provider payload не добавлялись в репозиторий или отчёт проверки. Автотесты остаются детерминированными и не обращаются к TMDB. README дополнен настройкой провайдера, переменными окружения, примером endpoint, ошибками, ограничениями, атрибуцией и ML/AI gate.
-
-## Организация Sprint 18
-
-Общая ветка — `feature/local-recommendations-sprint`, общий draft PR #12 создан с ANT-25 на базе `main`. Для ANT-25–ANT-30 сохраняется отдельный коммит на задачу с ANT-идентификатором.
-
-Sprint 18 использует только фильмы из локальной PostgreSQL и вручную составленные жанры. В нём нет импорта или сохранения TMDB results, обращений к TMDB из recommendation flow и ML/AI-компонента. Это сохраняет границу, установленную в `docs/EXTERNAL_MOVIE_API.md`.
-
-ANT-25: контракт в `docs/LOCAL_RECOMMENDATIONS.md` задаёт будущий `GET /movies/{movie_id}/recommendations?limit=5`, диапазон limit 1–20 и стабильный response envelope. Кандидаты сортируются по числу общих нормализованных жанров, затем по близости года и локальному ID; исходный фильм и фильмы без общих жанров исключаются. Для неизвестного ID сохраняется текущий `404`, отсутствие жанров или совпадений даёт `200` с пустым списком, неверный limit — `422`. Жанры представлены отсортированным списком строк в нижнем регистре; пробелы нормализуются, blank/duplicate/>10/>50 символов отклоняются. Документ содержит рабочий пример и явно фиксирует rule-based, local-only границу без TMDB и ML/AI.
-
-ANT-26: миграция `8f3a2d7c1b4e` добавляет `movies.genres` как `varchar(50)[] NOT NULL` с пустым серверным default. Существующие строки после upgrade получают пустой массив. Create/read/update-схемы и CRUD-маршруты принимают и возвращают жанры; Pydantic обрезает края, схлопывает внутренние пробелы, приводит строки к lowercase и сортирует список, отклоняя blank, дубликаты после нормализации, нестроковые значения, более 10 жанров и строки длиннее 50 символов. Service передаёт канонический список repository, а commit/rollback по-прежнему принадлежат service. Upgrade проверен на отдельном временном PostgreSQL-кластере: строка, созданная на ревизии `474e3311e20a`, сохранилась и получила `{}`; итоговая ревизия — `8f3a2d7c1b4e`. Пройдено 92 теста и Ruff.
-
-ANT-27: команда `python -m app.cli.seed_demo` явно и только по запросу добавляет 12 придуманных для приложения фильмов с годами и локальными жанрами; описаний, provider ID и TMDB content в наборе нет. Команда разрешает PostgreSQL только на loopback/`localhost` или Compose-host `db` и development-подобное имя базы, а в выводе не показывает credentials. Service проверяет существующие пары `(title, release_year)`, добавляет только отсутствующие записи одной транзакцией и не изменяет совпавшие строки. На отдельной свежей базе первый запуск создал 12 записей, после ручного изменения одной записи повторный запуск вернул `created=0, skipped=12`; `GET /movies/?limit=20` ответил `200`, вернул 12 фильмов и сохранил пользовательскую правку. Seed не подключён к startup, Alembic, entrypoint или CI. Пройдено 103 теста и Ruff.
-
-ANT-28: `RecommendationService` читает источник и локальных кандидатов через `MovieRepository`, исключает источник и фильмы без общих жанров, затем сортирует по числу совпавших жанров по убыванию, абсолютной разнице лет по возрастанию и локальному ID по возрастанию. Результат ограничивается диапазоном 1–20 и содержит `matching_genres`, поэтому будущий endpoint сможет объяснить рекомендацию без повторного вычисления. Путь остаётся read-only и не использует TMDB, внешние сервисы или ML/AI. Unit-тесты покрывают все tie-breaker, исключения, limit, пустые результаты и неизвестный source. На 12 локальных demo-фильмах источник `Orbit of Glass` вернул стабильные пять рекомендаций через прямой вызов service/repository. Пройдено 110 тестов и Ruff.
-
-ANT-29: `GET /movies/{movie_id}/recommendations` подключает локальный `RecommendationService` через FastAPI DI. Router проверяет положительный `movie_id` и `limit` от 1 до 20 с default `5`, возвращает ранжированный application-owned ответ с `matching_genres`, сохраняет существующий `MovieNotFoundError` как `404` и отвечает `200` с пустым списком при отсутствии совпадений. OpenAPI описывает `200`, `404` и `422`. Endpoint-тесты подменяют service и не используют PostgreSQL, TMDB или сеть; полный набор — 120 тестов, Ruff проходит. Read-only запуск с локальной PostgreSQL подтвердил `/health/db`, пять рекомендаций для demo-фильма `Orbit of Glass`, `422` для `limit=21`, `404` для неизвестного ID и наличие пути в OpenAPI.
-
-ANT-30: полный сценарий повторён на пустом изолированном PostgreSQL-кластере и записан в `docs/LOCAL_RECOMMENDATIONS_VERIFICATION.md`. Миграции дошли до `8f3a2d7c1b4e`; первый seed создал 12 фильмов, а повторный вернул `created=0, skipped=12`, сохранил ручную правку и не изменил число строк. Через HTTP подтверждены `/health/db`, полный CRUD одноразовой записи, ожидаемый порядок рекомендаций `2, 3, 4, 5, 6` для свежего `Orbit of Glass`, `404` неизвестного источника, `422` неверного limit и `200` с пустым списком для фильма без общих жанров. Временные API и PostgreSQL остановлены, основной development database и Docker volumes не затрагивались. Demo-каталог и рекомендации остаются local-only и независимы от TMDB; ML/AI по-прежнему ограничен решением из `docs/EXTERNAL_MOVIE_API.md`. Локально проходят 120 тестов и Ruff; удалённый CI фиксируется в PR #12 и Linear после отправки коммита.
-
-## Организация Sprint 19
-
-Общая ветка — `feature/postgresql-integration-tests-sprint`, общий draft PR #13 создан на базе `main`. Для ANT-31–ANT-37 сохранены отдельные коммиты с ANT-идентификаторами; merge и закрытие задач остаются за пользовательской приёмкой.
-
-ANT-31–ANT-32: `docs/POSTGRESQL_INTEGRATION_TESTS.md` фиксирует opt-in контракт отдельной disposable базы, разрешённые имена/hosts, обязательный `INTEGRATION_DATABASE_URL`, реальные Alembic migrations и очистку данных. Pytest marker `integration` отделяет быстрые unit tests. Fixtures используют настоящий FastAPI dependency graph и PostgreSQL, не подменяя service/repository, и освобождают application pool между event loop тестов. Небезопасная или неоднозначная конфигурация отклоняется до соединения; обычная development database не затрагивается.
-
-ANT-33–ANT-35: 15 integration-тестов проходят через реальную границу HTTP → FastAPI → Service → Repository → PostgreSQL. Покрыты CRUD и rollback для неизвестных записей, полный fictional demo catalog, повторный seed и сохранение пользовательской правки, а также ranking рекомендаций, оба tie-breaker, limit, `matching_genres`, исключения, `404`, `422` и пустой успешный ответ. TMDB endpoint не вызывается; настройки провайдера фиктивные.
-
-ANT-36–ANT-37: CI разделён на независимые `quality` и `integration` jobs. После их успеха запускается Docker build/smoke; публикация по-прежнему возможна только для push в `main`. Итоговый зелёный run https://github.com/darkskieshavefallen/movie-recommendation-api/actions/runs/35126703208 на текущем документированном HEAD подтвердил 120 unit tests, Ruff, 15 integration tests, миграции и Docker smoke. В намеренно красном run https://github.com/darkskieshavefallen/movie-recommendation-api/actions/runs/35126185550 unit job прошёл, integration assertion упал, а Docker delivery и публикация были skipped; временный коммит `da55a68` отменён коммитом `d020585`.
-
-Следующий планируемый продуктовый этап после приёмки Sprint 19 — React frontend. Server deployment остаётся отдельным более поздним этапом.
-
-## Организация Docker-спринта (завершён, история)
-
-Одна ветка `feature/docker-sprint` от `main` и один PR на весь текущий спринт подготовки и Docker. По решению пользователя на каждую задачу ANT-5–ANT-11 создаётся отдельный коммит. После реализации задачи в Linear добавляется комментарий по-русски с результатами проверок и ссылкой на коммит.
-
-Сохраняем поэтапное объяснение каждого нового файла. Общий draft PR открыт в начале спринта: https://github.com/darkskieshavefallen/movie-recommendation-api/pull/8. Все дальнейшие коммиты отправляем в `feature/docker-sprint`, обновляя описание PR по мере выполнения задач. В PR перечислены все семь задач Linear. После завершения спринта передаём PR на ревью в отдельную задачу Codex, затем дорабатываем ту же ветку. Merge и закрытие задач — по поручению пользователя.
-
-## Docker: согласованные решения
-
-- Сначала простой development-образ `python:3.13-slim`, WORKDIR `/app`, `PYTHONUNBUFFERED=1`, порт 8000 и запуск `uvicorn app.main:app --host 0.0.0.0 --port 8000`.
-- Изучить слои и кэширование. Файлы, нужные для установки зависимостей, копировать до остального исходного кода. План использует `pip install -e ".[dev]"`; проверь требования setuptools, README и обнаружения пакетов реальной сборкой. Не копируй непроверенный пример из старого чата буквально.
-- Затем .dockerignore, исключающий .env, venv, Git/IDE-файлы, кэши и прочие локальные артефакты.
-- Entrypoint применяет `alembic upgrade head`, прекращает запуск при ошибке и передаёт управление основному процессу через exec.
-- Compose содержит только api и db. PostgreSQL использует именованный volume `postgres_data` и healthcheck; api ждёт готовности БД.
-- Compose передаёт DATABASE_URL с хостом `db`. Для локального запуска остаётся `localhost`; вручную переключать .env между режимами не нужно.
-- Пока без отдельного контейнера миграций, Redis, Nginx, Celery, production Compose, bind mounts, multi-stage и преждевременной оптимизации.
-- Итоговая проверка: `docker compose up`, автоматические миграции, `/health`, `/health/db`, Swagger и CRUD. Данные сохраняются после перезапуска. Проверки изменения данных выполняй на отдельной тестовой БД/данных.
-- README должен описывать воспроизводимый запуск и все реальные предпосылки, включая Docker и создание локальной конфигурации, если она требуется.
+- Linear project: https://linear.app/dshf/project/movie-recommendation-api-1f35c4e4ad7e/issues
+- GitHub repository: https://github.com/darkskieshavefallen/movie-recommendation-api
+- Внешний каталог: `docs/EXTERNAL_MOVIE_API.md`
+- Локальные рекомендации: `docs/LOCAL_RECOMMENDATIONS.md`
+- Integration tests: `docs/POSTGRESQL_INTEGRATION_TESTS.md`
+- Docker/CI: `docs/DOCKER_VERIFICATION.md`, `docs/CI_VERIFICATION.md`
