@@ -8,7 +8,7 @@
 
 Стек: Python 3.13, FastAPI, Pydantic v2, SQLAlchemy async, asyncpg, PostgreSQL, Alembic, pytest, Ruff. Есть DI, сервисы/репозитории, обработчики ошибок и централизованное логирование.
 
-Текущая точка: Docker-спринт влит через PR #8, Sprint 16 — через PR #9, а итоговая документация — через PR #10. Sprint 17 реализован задачами ANT-18–ANT-24 и влит через PR #11; main CI после merge прошёл. Sprint 18 — Local catalog and first recommendations реализован задачами ANT-25–ANT-30 в общей ветке `feature/local-recommendations-sprint`; draft PR #12 на `main` ожидает отдельного ревью и решения пользователя о merge.
+Текущая точка: Docker-спринт влит через PR #8, Sprint 16 — через PR #9, а итоговая документация — через PR #10. Sprint 17 реализован задачами ANT-18–ANT-24 и влит через PR #11. Sprint 18 — Local catalog and first recommendations — реализован задачами ANT-25–ANT-30 и влит через PR #12. Sprint 19 реализуется задачами ANT-31–ANT-37 в общей ветке `feature/postgresql-integration-tests-sprint`; draft PR #13 ожидает отдельного ревью и решения пользователя о merge.
 
 ANT-12: опубликован коммит `13352d5`, добавлен `.github/workflows/ci.yml` для PR в main и push в main: Ubuntu, Python 3.13, установка `.[dev]`, Ruff и pytest. Настройки заданы явно в env без секретов; PostgreSQL не запускается, доступ к БД подменён в существующих тестах. Локально, в копии без `.env` и на чистом GitHub runner проверки прошли: 16 тестов, Ruff. Удалённый запуск: https://github.com/darkskieshavefallen/movie-recommendation-api/actions/runs/34412395887. Ссылки на коммит, ветку и PR прикреплены к Linear; задача закрыта.
 
@@ -103,6 +103,18 @@ ANT-28: `RecommendationService` читает источник и локальн�
 ANT-29: `GET /movies/{movie_id}/recommendations` подключает локальный `RecommendationService` через FastAPI DI. Router проверяет положительный `movie_id` и `limit` от 1 до 20 с default `5`, возвращает ранжированный application-owned ответ с `matching_genres`, сохраняет существующий `MovieNotFoundError` как `404` и отвечает `200` с пустым списком при отсутствии совпадений. OpenAPI описывает `200`, `404` и `422`. Endpoint-тесты подменяют service и не используют PostgreSQL, TMDB или сеть; полный набор — 120 тестов, Ruff проходит. Read-only запуск с локальной PostgreSQL подтвердил `/health/db`, пять рекомендаций для demo-фильма `Orbit of Glass`, `422` для `limit=21`, `404` для неизвестного ID и наличие пути в OpenAPI.
 
 ANT-30: полный сценарий повторён на пустом изолированном PostgreSQL-кластере и записан в `docs/LOCAL_RECOMMENDATIONS_VERIFICATION.md`. Миграции дошли до `8f3a2d7c1b4e`; первый seed создал 12 фильмов, а повторный вернул `created=0, skipped=12`, сохранил ручную правку и не изменил число строк. Через HTTP подтверждены `/health/db`, полный CRUD одноразовой записи, ожидаемый порядок рекомендаций `2, 3, 4, 5, 6` для свежего `Orbit of Glass`, `404` неизвестного источника, `422` неверного limit и `200` с пустым списком для фильма без общих жанров. Временные API и PostgreSQL остановлены, основной development database и Docker volumes не затрагивались. Demo-каталог и рекомендации остаются local-only и независимы от TMDB; ML/AI по-прежнему ограничен решением из `docs/EXTERNAL_MOVIE_API.md`. Локально проходят 120 тестов и Ruff; удалённый CI фиксируется в PR #12 и Linear после отправки коммита.
+
+## Организация Sprint 19
+
+Общая ветка — `feature/postgresql-integration-tests-sprint`, общий draft PR #13 создан на базе `main`. Для ANT-31–ANT-37 сохранены отдельные коммиты с ANT-идентификаторами; merge и закрытие задач остаются за пользовательской приёмкой.
+
+ANT-31–ANT-32: `docs/POSTGRESQL_INTEGRATION_TESTS.md` фиксирует opt-in контракт отдельной disposable базы, разрешённые имена/hosts, обязательный `INTEGRATION_DATABASE_URL`, реальные Alembic migrations и очистку данных. Pytest marker `integration` отделяет быстрые unit tests. Fixtures используют настоящий FastAPI dependency graph и PostgreSQL, не подменяя service/repository, и освобождают application pool между event loop тестов. Небезопасная или неоднозначная конфигурация отклоняется до соединения; обычная development database не затрагивается.
+
+ANT-33–ANT-35: 15 integration-тестов проходят через реальную границу HTTP → FastAPI → Service → Repository → PostgreSQL. Покрыты CRUD и rollback для неизвестных записей, полный fictional demo catalog, повторный seed и сохранение пользовательской правки, а также ranking рекомендаций, оба tie-breaker, limit, `matching_genres`, исключения, `404`, `422` и пустой успешный ответ. TMDB endpoint не вызывается; настройки провайдера фиктивные.
+
+ANT-36–ANT-37: CI разделён на независимые `quality` и `integration` jobs. После их успеха запускается Docker build/smoke; публикация по-прежнему возможна только для push в `main`. Итоговый зелёный run https://github.com/darkskieshavefallen/movie-recommendation-api/actions/runs/35126703208 на текущем документированном HEAD подтвердил 120 unit tests, Ruff, 15 integration tests, миграции и Docker smoke. В намеренно красном run https://github.com/darkskieshavefallen/movie-recommendation-api/actions/runs/35126185550 unit job прошёл, integration assertion упал, а Docker delivery и публикация были skipped; временный коммит `da55a68` отменён коммитом `d020585`.
+
+Следующий планируемый продуктовый этап после приёмки Sprint 19 — React frontend. Server deployment остаётся отдельным более поздним этапом.
 
 ## Организация Docker-спринта (завершён, история)
 

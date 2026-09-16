@@ -6,7 +6,10 @@ os.environ.update(
     {
         "APP_TITLE": "Test API",
         "APP_VERSION": "test",
-        "DATABASE_URL": "postgresql+asyncpg://test:test@localhost/test",
+        "DATABASE_URL": os.environ.get(
+            "INTEGRATION_DATABASE_URL",
+            "postgresql+asyncpg://test:test@localhost/test",
+        ),
         "LOG_LEVEL": "INFO",
         "TMDB_BASE_URL": "https://tmdb.invalid/3",
         "TMDB_READ_ACCESS_TOKEN": "test-fake-tmdb-read-access-token",

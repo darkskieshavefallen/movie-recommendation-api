@@ -10,26 +10,20 @@ permissions:
   contents: read
 
 jobs:
-  checks:
-    name: Checks, Docker build and smoke test
+  quality:
+    name: Ruff and unit tests
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    outputs:
-      checked_sha: ${{ steps.image_metadata.outputs.checked_sha }}
-      local_image: ${{ steps.image_metadata.outputs.local_image }}
-      image_id: ${{ steps.image_inspect.outputs.image_id }}
     env:
       APP_TITLE: Movie Recommendation API CI
       APP_VERSION: ci
-      # Unit tests mock database access; Compose provides its own database URL.
+      # Unit tests never connect to PostgreSQL.
       DATABASE_URL: postgresql+asyncpg://ci:ci@127.0.0.1:5432/movie_ci
       LOG_LEVEL: INFO
-      # Settings validation requires explicit fake integration values; CI never calls TMDB.
+      # Settings validation requires fake values; tests never call TMDB.
       TMDB_BASE_URL: https://tmdb.invalid/3
       TMDB_READ_ACCESS_TOKEN: ci-fake-tmdb-read-access-token
       TMDB_TIMEOUT_SECONDS: "5"
-      COMPOSE_FILE: .github/compose.ci.yml
-      COMPOSE_PROJECT_NAME: movie-ci-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
@@ -45,8 +39,91 @@ jobs:
       - name: Run Ruff
         run: python -m ruff check .
 
-      - name: Run tests
-        run: python -m pytest -q
+      - name: Run unit tests
+        run: python -m pytest -q -m "not integration"
+
+  integration:
+    name: PostgreSQL integration tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: integration
+          POSTGRES_PASSWORD: integration
+          POSTGRES_DB: movie_recommendation_integration_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U integration -d movie_recommendation_integration_ci"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 30
+    env:
+      CI: "true"
+      APP_TITLE: Movie Recommendation API Integration CI
+      APP_VERSION: ci
+      DATABASE_URL: postgresql+asyncpg://integration:integration@127.0.0.1:5432/movie_recommendation_integration_ci
+      INTEGRATION_DATABASE_URL: postgresql+asyncpg://integration:integration@127.0.0.1:5432/movie_recommendation_integration_ci
+      LOG_LEVEL: INFO
+      TMDB_BASE_URL: https://tmdb.invalid/3
+      TMDB_READ_ACCESS_TOKEN: ci-fake-tmdb-read-access-token
+      TMDB_TIMEOUT_SECONDS: "5"
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+
+      - name: Install dependencies
+        run: python -m pip install -e ".[dev]"
+
+      - name: Wait for PostgreSQL
+        timeout-minutes: 1
+        run: |
+          for attempt in $(seq 1 30); do
+            pg_isready \
+              --host 127.0.0.1 \
+              --port 5432 \
+              --username integration \
+              --dbname movie_recommendation_integration_ci && exit 0
+            sleep 2
+          done
+          docker ps --all
+          exit 1
+
+      - name: Apply Alembic migrations
+        run: python -m alembic upgrade head
+
+      - name: Run PostgreSQL integration tests
+        run: python -m pytest -q -m integration
+
+  checks:
+    name: Docker build and smoke test
+    needs: [quality, integration]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      checked_sha: ${{ steps.image_metadata.outputs.checked_sha }}
+      local_image: ${{ steps.image_metadata.outputs.local_image }}
+      image_id: ${{ steps.image_inspect.outputs.image_id }}
+    env:
+      APP_TITLE: Movie Recommendation API CI
+      APP_VERSION: ci
+      DATABASE_URL: postgresql+asyncpg://ci:ci@127.0.0.1:5432/movie_ci
+      LOG_LEVEL: INFO
+      TMDB_BASE_URL: https://tmdb.invalid/3
+      TMDB_READ_ACCESS_TOKEN: ci-fake-tmdb-read-access-token
+      TMDB_TIMEOUT_SECONDS: "5"
+      COMPOSE_FILE: .github/compose.ci.yml
+      COMPOSE_PROJECT_NAME: movie-ci-${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
 
       - name: Set Docker image metadata
         id: image_metadata
