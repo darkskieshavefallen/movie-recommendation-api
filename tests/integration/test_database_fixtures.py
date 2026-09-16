@@ -56,6 +56,6 @@ async def test_approved_database_is_migrated(
         revision = await connection.scalar(text("SELECT version_num FROM alembic_version"))
         movie_table = await connection.scalar(text("SELECT to_regclass('public.movies')"))
 
-    assert revision == "temporary-ant-37-failure"
+    assert revision == "8f3a2d7c1b4e"
     assert movie_table == "movies"
     assert os.environ["TMDB_BASE_URL"] == "https://tmdb.invalid/3"
