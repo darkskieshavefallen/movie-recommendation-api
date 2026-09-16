@@ -1,10 +1,14 @@
 """Contract tests for integration database safety and setup."""
 
+import asyncio
 import os
 
 import pytest
+from alembic import command
+from alembic.config import Config
 from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncEngine
+from sqlalchemy.engine import URL
+from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
 from tests.integration.database import (
     CI_DATABASE_NAME,
@@ -13,6 +17,59 @@ from tests.integration.database import (
 )
 
 pytestmark = pytest.mark.integration
+
+
+async def insert_legacy_movies(database_url: URL) -> None:
+    """Insert rows accepted immediately before the ANT-38 migration."""
+    engine = create_async_engine(database_url)
+    try:
+        async with engine.begin() as connection:
+            await connection.execute(
+                text(
+                    "INSERT INTO movies "
+                    "(title, release_year, description, genres) VALUES "
+                    "('   ', 2000, NULL, '{}'), "
+                    "('Too old', 1800, NULL, '{}'), "
+                    "('Too new', 2200, NULL, '{}'), "
+                    "('Legacy valid', 1999, NULL, '{}')"
+                )
+            )
+    finally:
+        await engine.dispose()
+
+
+async def read_migration_result(
+    database_url: URL,
+) -> tuple[list[tuple[str, int]], dict[str, bool]]:
+    """Read retained rows and validation state after the real upgrade."""
+    engine = create_async_engine(database_url)
+    try:
+        async with engine.connect() as connection:
+            rows = list(
+                (
+                    await connection.execute(
+                        text(
+                            "SELECT title, release_year FROM movies "
+                            "ORDER BY id"
+                        )
+                    )
+                ).tuples()
+            )
+            constraints = dict(
+                (
+                    await connection.execute(
+                        text(
+                            "SELECT conname, convalidated "
+                            "FROM pg_constraint "
+                            "WHERE conrelid = 'movies'::regclass "
+                            "AND conname LIKE 'ck_movies_%'"
+                        )
+                    )
+                ).tuples()
+            )
+        return rows, constraints
+    finally:
+        await engine.dispose()
 
 
 @pytest.mark.parametrize(
@@ -47,6 +104,30 @@ def test_application_database_url_is_rejected() -> None:
             application_database_url=url,
             is_ci=False,
         )
+
+
+def test_constraint_migration_cleans_only_invalid_legacy_rows(
+    migrated_database: None,
+    integration_database_url: URL,
+) -> None:
+    """Upgrade a populated previous revision without blocking application startup."""
+    config = Config("alembic.ini")
+    command.downgrade(config, "8f3a2d7c1b4e")
+    try:
+        asyncio.run(insert_legacy_movies(integration_database_url))
+
+        command.upgrade(config, "head")
+
+        rows, constraints = asyncio.run(
+            read_migration_result(integration_database_url)
+        )
+        assert rows == [("Legacy valid", 1999)]
+        assert constraints == {
+            "ck_movies_release_year_range": True,
+            "ck_movies_title_length": True,
+        }
+    finally:
+        command.upgrade(config, "head")
 
 
 async def test_approved_database_is_migrated(

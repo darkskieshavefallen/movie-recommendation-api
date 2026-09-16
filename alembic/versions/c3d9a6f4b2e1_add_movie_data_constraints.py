@@ -18,6 +18,14 @@ depends_on: str | Sequence[str] | None = None
 
 def upgrade() -> None:
     """Reject blank titles and release years outside the public API range."""
+    # The pre-ANT-38 contract accepted these values. Existing databases contain
+    # only disposable demo/test rows, so remove only records that cannot satisfy
+    # the new public contract before PostgreSQL validates the constraints.
+    op.execute(
+        "DELETE FROM movies "
+        "WHERE length(btrim(title)) = 0 "
+        "OR release_year NOT BETWEEN 1888 AND 2100"
+    )
     op.create_check_constraint(
         "ck_movies_title_length",
         "movies",

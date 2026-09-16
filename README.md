@@ -148,6 +148,10 @@ the existing `offset` and `limit` parameters and are ordered by local ID, so
 pagination is deterministic. Recommendations use only local PostgreSQL data and
 rank by shared genre count, release-year distance, then local ID.
 
+When upgrading from the pre-ANT-38 schema, the constraint migration removes
+only incompatible disposable demo/test rows: blank titles and years outside
+1888-2100. Valid existing rows are retained.
+
 ## Demo catalog
 
 The explicit development command inserts missing fictional demo movies and does
