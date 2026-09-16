@@ -45,28 +45,28 @@ async def read_migration_result(
     engine = create_async_engine(database_url)
     try:
         async with engine.connect() as connection:
-            rows = list(
-                (
-                    await connection.execute(
-                        text(
-                            "SELECT title, release_year FROM movies "
-                            "ORDER BY id"
-                        )
-                    )
-                ).tuples()
+            row_result = await connection.execute(
+                text(
+                    "SELECT title, release_year FROM movies "
+                    "ORDER BY id"
+                )
             )
-            constraints = dict(
-                (
-                    await connection.execute(
-                        text(
-                            "SELECT conname, convalidated "
-                            "FROM pg_constraint "
-                            "WHERE conrelid = 'movies'::regclass "
-                            "AND conname LIKE 'ck_movies_%'"
-                        )
-                    )
-                ).tuples()
+            rows = [
+                (title, release_year)
+                for title, release_year in row_result.tuples()
+            ]
+            constraint_result = await connection.execute(
+                text(
+                    "SELECT conname, convalidated "
+                    "FROM pg_constraint "
+                    "WHERE conrelid = 'movies'::regclass "
+                    "AND conname LIKE 'ck_movies_%'"
+                )
             )
+            constraints = {
+                name: validated
+                for name, validated in constraint_result.tuples()
+            }
         return rows, constraints
     finally:
         await engine.dispose()
