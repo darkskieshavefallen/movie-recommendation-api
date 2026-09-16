@@ -108,9 +108,8 @@ async def test_search_endpoint_returns_empty_results(
 
 
 async def test_search_endpoint_returns_503_when_catalog_is_disabled():
-    """The optional endpoint fails safely without constructing a TMDB client."""
+    """The optional endpoint fails safely without initialized provider state."""
     app = FastAPI()
-    app.state.tmdb_movie_client = None
     app.include_router(router)
     register_exception_handlers(app)
 

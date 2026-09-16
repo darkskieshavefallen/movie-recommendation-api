@@ -14,7 +14,7 @@ from app.services.recommendation import RecommendationService
 
 def get_tmdb_movie_client(request: Request) -> TmdbMovieClient:
     """Return the application-scoped external movie client."""
-    client = request.app.state.tmdb_movie_client
+    client = getattr(request.app.state, "tmdb_movie_client", None)
     if client is None:
         raise ExternalMovieDisabledError()
     return client
