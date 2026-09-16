@@ -27,7 +27,7 @@ Currently implements local movie CRUD, deterministic local recommendations, and 
 - Centralized configuration with pydantic-settings
 - Automatic OpenAPI & Swagger documentation
 - Code quality with Ruff
-- Service, dependency, and entrypoint tests using pytest
+- Fast unit tests and PostgreSQL integration tests using pytest
 
 ---
 
@@ -370,40 +370,76 @@ http://localhost:8000/redoc
 
 ## Checks and Current Sprint
 
-Run unit tests and lint checks from the repository root (Linux/macOS):
+Run the fast unit suite and lint checks from the repository root
+(Linux/macOS). Neither command requires PostgreSQL:
 
 ```bash
-.venv/bin/python -m pytest -q
+.venv/bin/python -m pytest -q -m "not integration"
 .venv/bin/python -m ruff check .
 ```
+
+The database-backed suite is deliberately opt-in. Create an empty disposable
+PostgreSQL 16 database whose name is exactly
+`movie_recommendation_integration_test`, then pass its URL explicitly:
+
+```bash
+INTEGRATION_DATABASE_URL='postgresql+asyncpg://integration:integration@localhost/movie_recommendation_integration_test' \
+  .venv/bin/python -m pytest -q -m integration
+```
+
+The suite rejects a missing or ambiguous URL, the normal development database,
+unapproved database names, non-loopback local hosts, and non-asyncpg drivers.
+It applies the real Alembic chain and truncates only the approved database's
+application tables before and after each test. It uses fake TMDB settings and
+never calls the provider. See the complete [PostgreSQL integration test
+contract](docs/POSTGRESQL_INTEGRATION_TESTS.md), including the combined-suite
+command and CI database rules.
 
 To run checks inside the built image without invoking startup migrations:
 
 ```bash
-docker compose run --rm --no-deps --entrypoint python api -m pytest -q
+docker compose run --rm --no-deps --entrypoint python api -m pytest -q -m "not integration"
 docker compose run --rm --no-deps --entrypoint python api -m ruff check .
 ```
 
 On Windows, use `.venv\Scripts\python.exe`. If cache writes are restricted, add `-p no:cacheprovider` to pytest and `--no-cache` to Ruff.
 
-Verified on 2026-09-16: all 120 tests pass and Ruff checks pass. The suite covers local movie CRUD and genres, demo-catalog idempotency and target safety, deterministic recommendation ranking and HTTP behavior, external settings, TMDB normalization and failure mappings, dependency wiring, application lifecycle, and endpoint validation. External tests use mock transports or dependency overrides and never contact TMDB; unit tests do not require a live database. Separate disposable-database checks verified migrations, the opt-in demo seed, API reads, and Docker startup; see [verification results](docs/DOCKER_VERIFICATION.md).
+Verified on 2026-09-16: 120 unit tests, 15 PostgreSQL integration tests, Ruff,
+and the Docker smoke check pass in [GitHub Actions run
+35126294248](https://github.com/darkskieshavefallen/movie-recommendation-api/actions/runs/35126294248).
+The integration suite verifies migrations, CRUD, seed idempotency and edit
+preservation, plus deterministic recommendation order through the real
+HTTP → FastAPI → Service → Repository → PostgreSQL path.
 
 The Docker sprint (ANT-5–ANT-11) was merged into `main` through [PR #8](https://github.com/darkskieshavefallen/movie-recommendation-api/pull/8).
 
 ### Continuous integration and image publishing (ANT-12–ANT-17)
 
-The pipeline runs these stages in order:
+The pipeline runs these stages:
 
-1. Install the development dependencies on Python 3.13, then run Ruff and pytest.
-2. Build the Dockerfile once and tag the image with the exact checked-out commit SHA.
-3. Start that image with an isolated PostgreSQL service, verify the Alembic revision, and check `/health` plus `/health/db`.
-4. On pushes to `main` only, transfer the verified image to a separate job and publish it to GHCR without rebuilding.
+1. Run Ruff and 120 unit tests without PostgreSQL.
+2. In a separate job, start PostgreSQL 16, apply Alembic migrations, and run
+   the 15 tests marked `integration` with fake TMDB settings.
+3. After both jobs pass, build the Dockerfile once, start that image with its
+   isolated smoke database, and verify migrations plus both health endpoints.
+4. On pushes to `main` only, transfer the verified image to a separate job and
+   publish it to GHCR without rebuilding.
 
 The CI badge at the top of this README reports the latest `main` workflow. Pull request checks validate stages 1–3 and skip publication. The first complete `main` delivery, including stage 4 and a pull-by-digest verification, succeeded after [PR #9](https://github.com/darkskieshavefallen/movie-recommendation-api/pull/9) was merged. Detailed evidence is recorded in [CI verification](docs/CI_VERIFICATION.md).
 
-[GitHub Actions workflow](.github/workflows/ci.yml) runs on pull requests targeting `main` and pushes to `main`. Its `checks` job uses a fresh GitHub-hosted Ubuntu runner with Python 3.13. Steps check out the repository, install dependencies with `python -m pip install -e ".[dev]"`, and run Ruff followed by pytest using the commands above. A failed step fails the job; failures are not ignored.
+[GitHub Actions workflow](.github/workflows/ci.yml) runs on pull requests
+targeting `main` and pushes to `main`. The `quality` and `integration` jobs use
+fresh GitHub-hosted Ubuntu runners with Python 3.13. The integration job owns a
+disposable PostgreSQL service and explicit CI-only credentials; it requires no
+repository secret.
 
-The job's `env` block provides explicit non-sensitive application settings, including a fake TMDB URL and token, so CI needs no `.env` file or repository secrets and never contacts the real provider. The database URL is also a placeholder: existing unit tests mock database access and require no PostgreSQL service or migrations.
+Both jobs provide explicit non-sensitive application settings, including a fake
+TMDB URL and token, so CI needs no `.env` file and never contacts the real
+provider. Integration failure blocks the dependent Docker smoke job, image
+export, and publication. [Intentional failure run
+35126185550](https://github.com/darkskieshavefallen/movie-recommendation-api/actions/runs/35126185550)
+confirmed this behavior while the unit job stayed green; the temporary test
+change was then reverted.
 
 After Ruff and pytest pass, the same job builds the repository's Dockerfile with `docker build --tag "$CI_IMAGE" .`; the root `.dockerignore` filters the build context. `CI_IMAGE` is set to `movie-recommendation-api:<full-commit-sha>` using `git rev-parse HEAD` and passed to subsequent steps through `GITHUB_ENV`. For a pull request, the checked-out commit is normally GitHub's temporary merge commit, so the tag identifies the code actually tested.
 
@@ -491,10 +527,10 @@ See [project context](docs/PROJECT_CONTEXT.md) for the agreed sequence and Docke
 - [x] Docker
 - [x] CI checks, Docker build, and PostgreSQL smoke pipeline
 - [x] GHCR publication and pull verification
-- [ ] Server deployment
 - [x] External movie API integration
-- [ ] Recommendation engine
-- [ ] React frontend
+- [x] Local deterministic recommendation engine
+- [ ] React frontend — next planned product stage
+- [ ] Server deployment
 
 ---
 
