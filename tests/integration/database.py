@@ -6,7 +6,7 @@ from sqlalchemy.exc import ArgumentError
 LOCAL_DATABASE_NAME = "movie_recommendation_integration_test"
 CI_DATABASE_NAME = "movie_recommendation_integration_ci"
 LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1"}
-CI_HOST = "postgres"
+CI_HOST = "127.0.0.1"
 
 
 def validate_integration_database_url(

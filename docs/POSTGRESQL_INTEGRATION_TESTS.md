@@ -23,7 +23,8 @@ true:
 - the variable is absent or the URL cannot be parsed unambiguously;
 - the scheme is not `postgresql+asyncpg`;
 - the host is not a loopback host (`localhost`, `127.0.0.1`, or `::1`) in a
-  local run, or the exact CI service host `postgres` when `CI=true`;
+  local run, or the exact published CI service host `127.0.0.1` when
+  `CI=true`;
 - the database name is not one of the two dedicated names above;
 - the URL equals the application's normal `DATABASE_URL`.
 
@@ -71,5 +72,8 @@ INTEGRATION_DATABASE_URL='postgresql+asyncpg://integration:integration@localhost
   .venv/bin/python -m pytest -q
 ```
 
-The fixtures implement these checks before opening a connection. Later Sprint
-19 tasks add the application scenarios and the dedicated CI job.
+The CI workflow keeps Ruff and unit tests in a fast job that needs no database.
+A separate job starts PostgreSQL 16, waits with a bounded readiness check,
+applies Alembic migrations, and runs only tests marked `integration`. The
+Docker build and smoke test depends on both jobs, so an integration failure
+also blocks image export and publication.
