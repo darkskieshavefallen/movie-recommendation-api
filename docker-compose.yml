@@ -19,7 +19,7 @@ services:
         condition: service_healthy
 
   db:
-    image: postgres:16
+    image: postgres:18
     environment:
       POSTGRES_USER: movie_app
       POSTGRES_PASSWORD: movie_app_dev
