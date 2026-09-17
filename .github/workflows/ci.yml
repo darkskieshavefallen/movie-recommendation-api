@@ -197,7 +197,7 @@ jobs:
       digest: ${{ steps.push.outputs.digest }}
     steps:
       - name: Download verified image artifact
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v8
         with:
           name: verified-image-${{ needs.checks.outputs.checked_sha }}
           path: ${{ runner.temp }}
