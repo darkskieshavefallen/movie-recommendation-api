@@ -9,6 +9,9 @@ __pycache__/
 # IDE
 .idea/
 
+# macOS
+.DS_Store
+
 # Environment
 .env
 
