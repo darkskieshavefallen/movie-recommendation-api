@@ -28,10 +28,10 @@ jobs:
       TMDB_TIMEOUT_SECONDS: "5"
     steps:
       - name: Check out repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v7
         with:
           python-version: '3.13'
 
@@ -76,10 +76,10 @@ jobs:
       TMDB_TIMEOUT_SECONDS: "5"
     steps:
       - name: Check out repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v7
         with:
           python-version: '3.13'
 
@@ -129,7 +129,7 @@ jobs:
       COMPOSE_PROJECT_NAME: movie-ci-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
       - name: Check out repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Set Docker image metadata
         id: image_metadata
@@ -175,7 +175,7 @@ jobs:
 
       - name: Upload verified image artifact
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: verified-image-${{ steps.image_metadata.outputs.checked_sha }}
           path: ${{ runner.temp }}/verified-image.tar
@@ -197,7 +197,7 @@ jobs:
       digest: ${{ steps.push.outputs.digest }}
     steps:
       - name: Download verified image artifact
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v8
         with:
           name: verified-image-${{ needs.checks.outputs.checked_sha }}
           path: ${{ runner.temp }}
